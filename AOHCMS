@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Efetivação Remessa para outro Gabinete">
+    <description><![CDATA[asgdawa]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Setor do cumprimento">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:5903')}"/>
+    </swimlane>
+    <swimlane name="Assessoria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('6:5197,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('7:1469')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Efetivação Remessa para outro Gabinete">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:1,8:5904')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="Encaminhar para órgão diverso" name="Encaminhar para órgão diverso"/>
+    </start-state>  
+    <!-- NODES -->
+    <node name="Encaminhar para órgão diverso">
+        <transition to="Deslocar para outro gabinete" name="Deslocar para outro gabinete"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoDestino', tramitacaoProcessualService.recuperaVariavel('orgaoJulgador').idOrgaoJulgador)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoDestino', (tramitacaoProcessualService.recuperaVariavel('orgaoJulgadorColegiado') == null ? tramitacaoProcessualService.recuperaVariavel('orgaoJulgador').getOrgaoJulgadorColegiadoOrgaoJulgadorList().get(0).getOrgaoJulgadorColegiado().getIdOrgaoJulgadorColegiado() : tramitacaoProcessualService.recuperaVariavel('orgaoJulgadorColegiado')))}"/>
+        </event>
+    </node>
+    <node name="Deslocar para outro gabinete">
+        <transition to="Minutar ato - não relator" name="Minutar ato - não relator"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.deslocarFluxoParaOrgaoDiverso()}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo('40').comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('teste').lancarMovimento()}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Minutar ato - não relator">
+        <task name="Minutar ato - não relator" swimlane="Assessoria">
+            <controller>
+                <variable name="minuta_ato_naorelator" mapped-name="textEditCombo:minuta_ato_naorelator" access="read,write"/>
+                <variable name="aviso2" mapped-name="textAlert:aviso2" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Confirmar ato - não relator" name="Encaminhar para assinatura"/>
+        <transition to="Nó de Desvio - Efetivação Remessa para outro Gabinete" name="Nó de Desvio - Efetivação Remessa para outro Gabinete">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:confirmaPrevencao', false)}"/>
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(5).lancarMovimento()}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{not empty processoHome.idProcessoDocumento ? org.jboss.seam.bpm.processInstance.contextInstance.setVariable('minutaEmElaboracao', processoHome.idProcessoDocumento) : ''}"/>
+        </event>
+        <event type="task-end">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', tramitacaoProcessualService.recuperaVariavelTarefa('textEditCombo:minuta_ato_naorelator'))}"/>
+        </event>
+        <event type="task-start">
+            <action name="Condicao do lancamento temporario de movimentos" expression="#{lancadorMovimentosService.setCondicaoLancamentoMovimentosTemporarioNoFluxo('#{true}')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:documento:tipo:minuta:ids','64')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Confirmar ato - não relator">
+        <task name="Confirmar ato - não relator" swimlane="Magistrado">
+            <controller>
+                <variable name="Processo_Fluxo_revisarMinuta" mapped-name="frame:Processo_Fluxo_revisarMinuta" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Minutar ato - não relator" name="Devolver para retificação"/>
+        <transition to="Devolver ao originário" name="Devolver ao originário">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Efetivação Remessa para outro Gabinete" name="Nó de Desvio - Efetivação Remessa para outro Gabinete">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Devolver ao originário')}"/>
+        </event>
+        <event type="task-start">
+            <action name="upd" expression="#{lancadorMovimentosService.setCondicaoLancamentoMovimentosTemporarioNoFluxo('#{false}')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:documento:tipo:minuta:ids','64')}"/>
+        </event>
+    </task-node>
+    <node name="Devolver ao originário">
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoDestino', tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoCargoDestino', tramitacaoProcessualService.recuperaProcesso().orgaoJulgadorCargo.idOrgaoJulgadorCargo)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoDestino', tramitacaoProcessualService.recuperaProcesso().orgaoJulgadorColegiado.idOrgaoJulgadorColegiado)}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.deslocarFluxoParaOrgaoDiverso()}"/>
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(200002).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.orgaoJulgador).lancarMovimento()}"/>
+        </event>
+    </node>
+    <end-state name="Término">
+        <event type="task-end">
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('orgaoJulgadorColegiado')}"/>
+            <action/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:orgaoDestino')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:colegiadoDestino')}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Efetivação Remessa para outro Gabinete">
+        <task name="Nó de Desvio - Efetivação Remessa para outro Gabinete" swimlane="Nó de Desvio - Efetivação Remessa para outro Gabinete"/>
+        <transition to="Minutar ato - não relator" name="Minutar ato - não relator"/>
+        <transition to="Confirmar ato - não relator" name="Confirmar ato - não relator"/>
+        <transition to="Término" name="Término"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
