@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Fluxo de bloqueio de ativos do devedor"> 
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Fluxo processual 2 Grau">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>
+    <swimlane name="solicitante">
+        <assignment actor-id="#{actor.id}"/>
+    </swimlane>
+    <swimlane name="Assessoria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('6:5197')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="Preparar ordem de bloqueio" name="Preparar ordem de bloqueio"/>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Preparar ordem de bloqueio">
+        <task name="Preparar ordem de bloqueio" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Enviar ordem de bloqueio" name="Enviar ordem de bloqueio"/>
+        <transition to="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Enviar ordem de bloqueio">
+        <task name="Enviar ordem de bloqueio" swimlane="Magistrado">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Aguardar resposta de bloqueio" name="Aguardar resposta de bloqueio"/>
+        <transition to="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar resposta de bloqueio">
+        <task name="Aguardar resposta de bloqueio" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame de upload de documento para que o servidor ou magistrado insira o PDF da resposta do Banco Central do Brasil]]></description>
+        <transition to="Avaliar resposta de bloqueio" name="Avaliar resposta de bloqueio"/>
+        <transition to="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Avaliar resposta de bloqueio">
+        <task name="Avaliar resposta de bloqueio" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Preparar ordem de bloqueio" name="Preparar nova ordem de bloqueio"/>
+        <transition to="Aguardar informação de transferência" name="Aguardar informação de transferência"/>
+        <transition to="Grava variável transferência frustrada" name="Minutar decisão - transferência frustada"/>
+        <transition to="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Gravar variável transferência total realizada" name="Cumprir determinações - transferência total realizada"/>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar informação de transferência">
+        <task name="Aguardar informação de transferência" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame de upload de documento demonstrativo da transferência]]></description>
+        <transition to="Gravar variável transferência total realizada" name="Confirmada a transferência total"/>
+        <transition to="Grava variável transferência frustrada" name="Confirmada a transferência parcial"/>
+        <transition to="Grava variável transferência frustrada" name="Transferência frustrada"/>
+        <transition to="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <node name="Grava variável transferência frustrada">
+        <transition to="Término" name="Finalizar"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:ef:conclusao','decisao')}"/>
+        </event>
+    </node>
+    <node name="Gravar variável transferência total realizada">
+        <description><![CDATA[]]></description>
+        <transition to="Término" name="Finalizar"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:ef:bloqueio','total')}"/>
+        </event>
+    </node>
+    <end-state name="Término">
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:tipoConclusao', 'decisao')}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor">
+        <task name="Nó de Desvio - Fluxo de bloqueio de ativos do devedor" swimlane="Assessoria"/>
+        <transition to="Preparar ordem de bloqueio" name="Preparar ordem de bloqueio"/>
+        <transition to="Enviar ordem de bloqueio" name="Enviar ordem de bloqueio"/>
+        <transition to="Aguardar resposta de bloqueio" name="Aguardar resposta de bloqueio"/>
+        <transition to="Avaliar resposta de bloqueio" name="Avaliar resposta de bloqueio"/>
+        <transition to="Aguardar informação de transferência" name="Aguardar informação de transferência"/>
+        <transition to="Término" name="Término"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
