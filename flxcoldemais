@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Apreciação colegiada por não relatores">
+    <description><![CDATA[Sub-fluxo de tramitação de processos relatados por outros julgadores, mas que podem ou devem ser apreciados por outros órgãos.]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Apreciação colegiada por não relatores">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:1,8:5904')}"/>
+    </swimlane>
+    <swimlane name="Conselheiro">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('4:1469,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Atribuidores da corregedoria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('4:1469')}"/>
+    </swimlane>
+    <swimlane name="Demais julgadores">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('4:1469,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Demais julgadores"/>
+        <transition to="Votar antecipadamente - não relator" name="Votar antecipadamente - não relator"/>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Votar antecipadamente - não relator">
+        <task name="Votar antecipadamente - não relator" swimlane="Conselheiro">
+            <controller>
+                <variable name="WEB-INF_xhtml_flx_votacaoVogal" mapped-name="frame:WEB-INF_xhtml_flx_votacaoVogal" access="read,write"/>
+            </controller>
+        </task>
+        <transition to=" Minutar voto - não relator" name="Enviar à assessoria"/>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Teste julgado em painel" name="Aguardar a sessão">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Aguardar a sessão')}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:flx:votacaoVogal:transicaoAutomatica:papeis','magistrado,pje:magistrado')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:colegiado:aguardaSessao', true)}"/>
+        </event>
+    </task-node>
+    <decision expression="#{sessaoPautaProcessoTrfManager.isProcessoJulgado(tramitacaoProcessualService.recuperaProcesso()) ? 'Teste orgão vencedor' : 'Testa voto divergente' }" name="Teste julgado em painel">
+        <transition to="Testa voto divergente" name="Testa voto divergente"/>
+        <transition to="Teste orgão vencedor" name="Teste orgão vencedor"/>
+    </decision>
+    <task-node end-tasks="true" name=" Minutar voto - não relator">
+        <task name="Minutar voto - não relator" swimlane="Demais julgadores">
+            <controller>
+                <variable name="WEB-INF_xhtml_flx_votacaoVogal" mapped-name="frame:WEB-INF_xhtml_flx_votacaoVogal" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Permite que o julgador não relator aprecie um processo alheio.]]></description>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Vincular a juiz auxiliar (não relator)" name="Vincular a magistrado">
+            <condition expression="#{not empty processoInstanceManager.findById(processInstance.id).orgaoJulgador and processoInstanceManager.findById(processInstance.id).orgaoJulgador == 3}"/>
+        </transition>
+        <transition to="Término" name="Finalizar sem preparar"/>
+        <transition to="Votar antecipadamente - não relator" name="Enviar ao magistrado"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:transicao:dispensaRequeridos','Término')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Vincular a juiz auxiliar (não relator)">
+        <task name="Vincular a juiz auxiliar" swimlane="Atribuidores da corregedoria">
+            <controller>
+                <variable name="WEB-INF_xhtml_flx_vincularMagistrado" mapped-name="frame:WEB-INF_xhtml_flx_vincularMagistrado" access="read,write"/>
+            </controller>
+        </task>
+        <transition to=" Minutar voto - não relator" name="Enviar à assessoria"/>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Votar antecipadamente - não relator" name="Enviar ao juiz auxiliar"/>
+    </task-node>
+    <task-node end-tasks="true" name="Conferir e liberar voto - não relator">
+        <task name="Conferir e liberar voto - não relator" swimlane="Conselheiro">
+            <controller>
+                <variable name="av_confirm_vt_n_relat" mapped-name="textAlert:av_confirm_vt_n_relat" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Votar antecipadamente - não relator" name="Para votação antecipada"/>
+    </task-node>
+    <decision expression="#{not empty tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:voto:id') and sessaoProcessoDocumentoVotoManager.findById(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:voto:id')).tipoVoto.contexto == 'D' ? 'Disparar evento divergência manifestada' : 'Aguardando a sessão (outros julgadores)'}" name="Testa voto divergente">
+        <transition to="Disparar evento divergência manifestada" name="Disparar evento divergência manifestada"/>
+        <transition to="Aguardando a sessão (outros julgadores)" name="Aguardando a sessão (outros julgadores)"/>
+    </decision>
+    <node name="Disparar evento divergência manifestada">
+        <transition to="Aguardando a sessão (outros julgadores)" name="Aguardando a sessão (outros julgadores)"/>
+    </node>
+    <task-node end-tasks="true" name="Aguardando a sessão (outros julgadores)">
+        <task name="Aguardando a sessão (outros julgadores)" swimlane="Demais julgadores">
+            <controller>
+                <variable name="WEB-INF_xhtml_flx_votacaoVogal" mapped-name="frame:WEB-INF_xhtml_flx_votacaoVogal" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Teste julgamento realizado" name="Teste julgamento realizado">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to=" Minutar voto - não relator" name="Retornar para minutar o voto"/>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Devolver processo para o relator" name="Devolver processo para o relator">
+            <condition expression="#{sessaoPautaProcessoTrfManager.getSessaoPautaProcessoTrfNaoJulgado(tramitacaoProcessualService.recuperaProcesso()).adiadoVista == 'PV'}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:colegiado:aguardaSessao', true)}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Teste julgamento realizado')}"/>
+        </event>
+        <event type="task-end">
+            <action expression="#{tramitacaoProcessualService.apagaVariavelTarefa('cnj:fluxo:colegiado:aguardaSessao')}"/>
+        </event>
+    </task-node>
+    <decision expression="#{'julgado' == processInstance.contextInstance.getVariable('pje:fluxo:colegiado:situacao') ? 'Teste orgão vencedor' : 'Aguardando a sessão (outros julgadores)'}" name="Teste julgamento realizado">
+        <transition to="Teste orgão vencedor" name="Teste orgão vencedor"/>
+        <transition to="Aguardando a sessão (outros julgadores)" name="Aguardando a sessão (outros julgadores)"/>
+    </decision>
+    <decision expression="#{not empty tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:orgaoVencedor:id') and tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:orgaoVencedor:id') != tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador ? 'Término' : 'Teste voto tem conteúdo'}" name="Teste orgão vencedor">
+        <transition to="Término" name="Término"/>
+        <transition to="Teste voto tem conteúdo" name="Teste voto tem conteúdo"/>
+    </decision>
+    <decision expression="#{not empty tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:julgamento:id') and not empty sessaoProcessoDocumentoVotoManager.recuperarVoto(sessaoPautaProcessoTrfManager.findById(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:colegiado:julgamento:id')).sessao, tramitacaoProcessualService.recuperaProcesso(),orgaoJulgadorManager.findById(processoInstanceManager.findById(processInstance.id).orgaoJulgador)).processoDocumento ? 'Confirmar voto - não relator' : 'Término'}" name="Teste voto tem conteúdo">
+        <transition to="Confirmar voto - não relator" name="Confirmar voto - não relator"/>
+        <transition to="Término" name="Término"/>
+    </decision>
+    <task-node end-tasks="true" name="Confirmar voto - não relator">
+        <task name="Confirmar voto - não relator" swimlane="Conselheiro">
+            <controller>
+                <variable name="WEB-INF_xhtml_flx_votacaoVogal" mapped-name="frame:WEB-INF_xhtml_flx_votacaoVogal" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Término" name="Finalizar apreciação"/>
+        <transition to="Aguardando a sessão (outros julgadores)" name="Aguardar a sessão"/>
+        <transition to="Nó de Desvio - Apreciação colegiada por não relatores" name="Nó de Desvio - Apreciação colegiada por não relatores">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Apreciação colegiada por não relatores">
+        <task name="Nó de Desvio - Apreciação colegiada por não relatores" swimlane="Nó de Desvio - Apreciação colegiada por não relatores"/>
+        <transition to=" Minutar voto - não relator" name=" Minutar voto - não relator"/>
+        <transition to="Conferir e liberar voto - não relator" name="Conferir e liberar voto - não relator"/>
+        <transition to="Aguardando a sessão (outros julgadores)" name="Aguardando a sessão (outros julgadores)"/>
+        <transition to="Confirmar voto - não relator" name="Confirmar voto - não relator"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Vincular a juiz auxiliar (não relator)" name="Vincular a magistrado"/>
+        <transition to="Votar antecipadamente - não relator" name="Votar antecipadamente - não relator"/>
+    </task-node>
+    <node name="Devolver processo para o relator">
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action expression="#{processoJudicialService.deslocarOrgaoJulgador(processoTrfHome.instance, processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador, processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado, processoTrfHome.instance.orgaoJulgadorCargo.idOrgaoJulgadorCargo)}"/>
+        </event>
+    </node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
