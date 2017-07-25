@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Liberação de ativos do devedor"> 
+    <!-- SWIMLANES -->
+    <swimlane name="Assessoria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('6:5197,7:1469,197:1338')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('7:1469')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Cumprir decisão em 2º Grau">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="Preparar ordem de liberação" name="Preparar ordem de liberação"/>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Preparar ordem de liberação">
+        <task name="Preparar ordem de liberação" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Enviar ordem de liberação" name="01 - Enviar ordem de liberação"/>
+        <transition to="Nó de Desvio - Fluxo de liberação de ativos do devedor" name="Nó de Desvio - Fluxo de liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Liberação de ativos do devedor" name="Nó de Desvio - Liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="02 - Finalizar"/>
+    </task-node>
+    <task-node end-tasks="true" name="Enviar ordem de liberação">
+        <task name="Enviar ordem de liberação" swimlane="Magistrado">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Aguardar resposta de liberação" name="Aguardar resposta de liberação"/>
+        <transition to="Nó de Desvio - Fluxo de liberação de ativos do devedor" name="Nó de Desvio - Fluxo de liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Liberação de ativos do devedor" name="Nó de Desvio - Liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar resposta de liberação">
+        <task name="Aguardar resposta de liberação" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame de upload de documento para que o servidor ou magistrado insira o PDF da resposta do Banco Central do Brasil]]></description>
+        <transition to="Avaliar resposta de liberação" name="Avaliar resposta de liberação"/>
+        <transition to="Nó de Desvio - Fluxo de liberação de ativos do devedor" name="Nó de Desvio - Fluxo de liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Liberação de ativos do devedor" name="Nó de Desvio - Liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Avaliar resposta de liberação">
+        <task name="Avaliar resposta de liberação" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Gravar variável recusa de liberação" name="Houve problema com a liberação"/>
+        <transition to="Término" name="Confirmada a liberação"/>
+        <transition to="Preparar ordem de liberação" name="Preparar nova ordem de liberação"/>
+        <transition to="Nó de Desvio - Fluxo de liberação de ativos do devedor" name="Nó de Desvio - Fluxo de liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Liberação de ativos do devedor" name="Nó de Desvio - Liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <node name="Gravar variável recusa de liberação">
+        <description><![CDATA[]]></description>
+        <transition to="Término" name="Término"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:ef:liberacao','recusada')}"/>
+        </event>
+    </node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Fluxo de liberação de ativos do devedor">
+        <task name="Nó de Desvio - Fluxo de liberação de ativos do devedor" swimlane="Nó de Desvio - Cumprir decisão em 2º Grau"/>
+        <transition to="Preparar ordem de liberação" name="Preparar ordem de liberação"/>
+        <transition to="Enviar ordem de liberação" name="Enviar ordem de liberação"/>
+        <transition to="Aguardar resposta de liberação" name="Aguardar resposta de liberação"/>
+        <transition to="Avaliar resposta de liberação" name="Avaliar resposta de liberação"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Liberação de ativos do devedor" name="Nó de Desvio - Liberação de ativos do devedor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Nó de Desvio - Liberação de ativos do devedor">
+        <task name="Nó de Desvio - Liberação de ativos do devedor" swimlane="Nó de Desvio - Cumprir decisão em 2º Grau"/>
+        <transition to="Preparar ordem de liberação" name="Preparar ordem de liberação"/>
+        <transition to="Enviar ordem de liberação" name="Enviar ordem de liberação"/>
+        <transition to="Aguardar resposta de liberação" name="Aguardar resposta de liberação"/>
+        <transition to="Avaliar resposta de liberação" name="Avaliar resposta de liberação"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Fluxo de liberação de ativos do devedor" name="Nó de Desvio - Fluxo de liberação de ativos do devedor"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
