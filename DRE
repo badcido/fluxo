@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Decisão recurso externo">
+    <description><![CDATA[]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Secretaria - Vice Presidência">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('201:1338,202:5483,207:1338')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Decisão recurso externo">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Intimações de recursos externos" name="Intimações de recursos externos"/>
+    </start-state>  
+    <!-- NODES -->
+    <process-state name="Intimações de recursos externos">
+        <sub-process name="Intimação de parte seguida da do MP" binding="late"/>
+        <transition to="Apreciar admissibilidade do recurso" name="Apreciar admissibilidade do recurso"/>
+    </process-state>
+    <process-state name="Apreciar admissibilidade do recurso">
+        <sub-process name="Preparar ato judicial" binding="late"/>
+        <transition to="Intimar da decisão de admissibilidade" name="Intimar da decisão de admissibilidade"/>
+    </process-state>
+    <process-state name="Intimar da decisão de admissibilidade">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Aguardar manifestação das partes sobre a admissibilidade" name="Aguardar manifestação das partes sobre a admissibilidade"/>
+    </process-state>
+    <process-state name="Aguardar manifestação das partes sobre a admissibilidade">
+        <sub-process name="Controle de prazos" binding="late"/>
+        <transition to="Avaliar manifestação" name="Avaliar manifestação"/>
+    </process-state>
+    <task-node end-tasks="true" name="Sobrestado">
+        <task name="Sobrestado" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Nó de Desvio - Decisão recurso externo" name="Nó de Desvio - Decisão recurso externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Avaliar decisão final RE" name="Avaliar decisão final RE"/>
+    </task-node>
+    <task-node end-tasks="true" name="Avaliar decisão final RE">
+        <task name="Avaliar decisão final RE" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Nó de Desvio - Decisão recurso externo" name="Nó de Desvio - Decisão recurso externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Certidão trânsito em julgado RE" name="Certidão trânsito em julgado RE"/>
+    </task-node>
+    <task-node end-tasks="true" name="Avaliar manifestação">
+        <task name="Avaliar manifestação" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Apreciar admissibilidade do recurso" name="Conclusos à vice-presidência"/>
+        <transition to="Nó de Desvio - Decisão recurso externo" name="Nó de Desvio - Decisão recurso externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Sobrestado" name="Sobrestado"/>
+        <transition to="Certidão trânsito em julgado RE" name="Certidão trânsito em julgado RE"/>
+    </task-node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Decisão recurso externo">
+        <task name="Nó de Desvio - Decisão recurso externo" swimlane="Nó de Desvio - Decisão recurso externo"/>
+        <transition to="Sobrestado" name="Sobrestado"/>
+        <transition to="Avaliar manifestação" name="Avaliar manifestação"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Avaliar decisão final RE" name="Avaliar decisão final RE"/>
+        <transition to="Certidão trânsito em julgado RE" name="Certidão trânsito em julgado RE"/>
+        <transition to="Arquivo Definitivo RE" name="Arquivo Definitivo RE"/>
+    </task-node>
+    <task-node end-tasks="true" name="Certidão trânsito em julgado RE">
+        <task name="Certidão trânsito em julgado RE" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Arquivo Definitivo RE" name="Arquivo Definitivo RE">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('arquivo').lancarMovimento()}"/>
+        </transition>
+        <transition to="Nó de Desvio - Decisão recurso externo" name="Nó de Desvio - Decisão recurso externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.setVariable('tiposDisponiveisIds', '70')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Arquivo Definitivo RE">
+        <task name="Arquivo Definitivo RE" swimlane="Secretaria - Vice Presidência"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Decisão recurso externo" name="Nó de Desvio - Decisão recurso externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Apreciar admissibilidade do recurso" name="Desarquivar">
+            <action expression="#{preencherMovimento.deCodigo(978).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('secretaria').lancarMovimento()}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{preencherMovimento.deCodigo(977).lancarMovimento()}"/>
+        </event>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
