@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Deslocar Órgão Julgador Processo">
+    <description><![CDATA[saaaa]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="solicitante">
+        <assignment actor-id="#{actor.id}"/>
+    </swimlane>
+    <swimlane name="Secretaria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:5904,8:5903,8:5902,8:5900')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Deslocar Órgão Julgador Processo">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:1338,1342:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="solicitante"/>
+        <transition to="Carregar Lista de Órgãos" name="Carregar Lista de Órgãos"/>
+    </start-state>  
+    <!-- NODES -->
+    <node name="Carregar Lista de Órgãos">
+        <transition to="Selecionar Órgão Julgador Destino" name="Selecionar Órgão Julgador Destino"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('listaOrgaosDestino', orgaoJulgadorHome.getOrgaoJulgadorListByOjc(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado()))}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Selecionar Órgão Julgador Destino">
+        <task name="Selecionar Órgão Julgador Destino" swimlane="Secretaria">
+            <controller>
+                <variable name="avisoDeslocamento" mapped-name="textAlert:avisoDeslocamento" access="read,write"/>
+                <variable name="orgaoJulgadorDestino" mapped-name="combo_objetos:orgaoJulgadorDestino" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Deslocar Órgão Julgador Processo" name="Nó de Desvio - Deslocar Órgão Julgador Processo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Validar campo Órgão Julgador" name="Confirmar"/>
+        <transition to="Término" name="Cancelar"/>
+        <event type="task-start">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('orgaoJulgadorDestino')}"/>
+        </event>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('orgaoJulgadorDestino') == null ? 'Mensagem Validação Deslocamento' : 'Confirmar Órgão Julgador Deslocamento' }" name="Validar campo Órgão Julgador">
+        <transition to="Mensagem Validação Deslocamento" name="Mensagem Validação Deslocamento"/>
+        <transition to="Confirmar Órgão Julgador Deslocamento" name="Confirmar Órgão Julgador Deslocamento"/>
+    </decision>
+    <task-node end-tasks="true" name="Mensagem Validação Deslocamento">
+        <task name="Mensagem Validação Deslocamento" swimlane="Secretaria">
+            <controller>
+                <variable name="msgAlertaDeslocamento" mapped-name="textAlert:msgAlertaDeslocamento" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Deslocar Órgão Julgador Processo" name="Nó de Desvio - Deslocar Órgão Julgador Processo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Selecionar Órgão Julgador Destino" name="Selecionar Órgão Julgador Destino"/>
+    </task-node>
+    <task-node end-tasks="true" name="Confirmar Órgão Julgador Deslocamento">
+        <task name="Confirmar Órgão Julgador Deslocamento" swimlane="Secretaria">
+            <controller>
+                <variable name="msgConfirmacaoDeslocamento" mapped-name="textAlert:msgConfirmacaoDeslocamento" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Deslocar Órgão Julgador Processo" name="Nó de Desvio - Deslocar Órgão Julgador Processo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Deslocar Processo" name="Sim"/>
+        <transition to="Selecionar Órgão Julgador Destino" name="Não"/>
+    </task-node>
+    <node name="Deslocar Processo">
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('orgaoJulgadorDestino', usuarioLocalizacaoMagistradoServidorManager.getMagistradoPorCargo(orgaoJulgadorCargoManager.getOrgaoJulgadorCargoEmExercicio(tramitacaoProcessualService.recuperaVariavel('orgaoJulgadorDestino'))))}"/>
+            <action expression="#{processoJudicialService.deslocarProcessoParaLocalizacaoDeJuiz(tramitacaoProcessualService.recuperaProcesso(), tramitacaoProcessualService.recuperaVariavel('orgaoJulgadorDestino'))}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('orgaoJulgadorDestino')}"/>
+        </event>
+    </node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Deslocar Órgão Julgador Processo">
+        <task name="Nó de Desvio - Deslocar Órgão Julgador Processo" swimlane="Nó de Desvio - Deslocar Órgão Julgador Processo"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Selecionar Órgão Julgador Destino" name="Selecionar Órgão Julgador Destino"/>
+        <transition to="Mensagem Validação Deslocamento" name="Mensagem Validação Deslocamento"/>
+        <transition to="Confirmar Órgão Julgador Deslocamento" name="Confirmar Órgão Julgador Deslocamento"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
