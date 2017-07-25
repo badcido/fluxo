@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Baixa de processo oriundo do 1 grau"> 
+    <!-- SWIMLANES -->
+    <swimlane name="solicitante">
+        <assignment actor-id="#{actor.id}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Baixa de processo oriundo do 1 grau">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="solicitante"/>
+        <transition to="Remeter ao 1º Grau" name="Remeter ao 1º Grau"/>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Remeter ao 1º Grau">
+        <task name="Remeter ao 1º Grau" swimlane="solicitante">
+            <controller>
+                <variable name="Intercomunicacao_retornoProcesso" mapped-name="frame:Intercomunicacao_retornoProcesso" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Baixa de processo oriundo do 1 grau" name="Nó de Desvio - Baixa de processo oriundo do 1 grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('Devolução de processo').comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(motivoRemessa.codigoGlossario).lancarMovimento()}"/>
+        </event>
+        <event type="task-start">
+            <action expression="#{taskInstanceUtil.setVariable('comboMotivoRemessa','18;37,38,39,40,90')}"/>
+        </event>
+    </task-node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Baixa de processo oriundo do 1 grau">
+        <task name="Nó de Desvio - Baixa de processo oriundo do 1 grau" swimlane="Nó de Desvio - Baixa de processo oriundo do 1 grau"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Remeter ao 1º Grau" name="Remeter ao 1º Grau"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
