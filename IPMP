@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Intimação de parte seguida da do MP">
+    <description><![CDATA[]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Intimação de parte seguida da do MP">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>
+    <swimlane name="Secretaria - Preparação e Publicação de Atos">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('199:5483,197:1338,202:5483,201:1338')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Secretaria - Preparação e Publicação de Atos"/>
+        <transition to="Intimação das partes" name="Intimação das partes"/>
+    </start-state>  
+    <!-- NODES -->
+    <process-state name="Intimação das partes">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Aguardar manifestação das partes" name="Aguardar manifestação das partes"/>
+    </process-state>
+    <process-state name="Aguardar manifestação das partes">
+        <sub-process name="Controle de prazos" binding="late"/>
+        <transition to="Avaliar intimações pendentes" name="Avaliar intimações pendentes"/>
+    </process-state>
+    <task-node end-tasks="true" name="Avaliar intimações pendentes">
+        <task name="Avaliar intimações pendentes" swimlane="Secretaria - Preparação e Publicação de Atos"/>
+        <transition to="Intimação das partes" name="Intimação das partes"/>
+        <transition to="Intimar Ministério Público" name="Intimar Ministério Público"/>
+        <transition to="Término" name="Não Intimar Ministério Público"/>
+        <transition to="Nó de Desvio - Intimação de parte seguida da do MP" name="Nó de Desvio - Intimação de parte seguida da do MP">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <process-state name="Intimar Ministério Público">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Aguardar manifestação do Minstério Público" name="Aguardar manifestação do Minstério Público"/>
+    </process-state>
+    <process-state name="Aguardar manifestação do Minstério Público">
+        <sub-process name="Controle de prazos" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Intimação de parte seguida da do MP">
+        <task name="Nó de Desvio - Intimação de parte seguida da do MP" swimlane="Nó de Desvio - Intimação de parte seguida da do MP"/>
+        <transition to="Avaliar intimações pendentes" name="Avaliar intimação do MP"/>
+        <transition to="Término" name="Término"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
