@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Analisar prevenção">
+    <description><![CDATA[Neste fluxo não funciona Minuta/Assinatura em lote para o chefe de secretaria e o magistrado assinarem em lote.]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Analista Dejaux">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('1052:5894,197:5894,1052:1338')}"/>
+    </swimlane>
+    <swimlane name="Gestor Dejaux">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('1052:1338')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Analisar prevenção">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('1052:1338')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="[AP] - Triagem" name="[AP] - Triagem"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('minutaEmElaboracao')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('atoordinatorio')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('MovimentosLancadosTemporariamente')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('AgrupamentosLancadosTemporariamente')}"/>
+        </event>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="[AP] - Triagem">
+        <task name="[AP] - Triagem" swimlane="Analista Dejaux"/>
+        <transition to="Analisar prevenção" name="01 - Encaminhar para análisar prevenção"/>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Minutar certidão de prevenção">
+        <task name="Minutar certidão de prevenção" swimlane="Analista Dejaux">
+            <controller>
+                <variable name="minutaEmElaboracao" mapped-name="textEditGabineteJT:minutaEmElaboracao" access="read,write"/>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame que permita a criação de mais de um documento para posterior assinatura quer de outro papel no cartório, quer do magistrado.]]></description>
+        <transition to="Assinar certidão de prevenção" name="01 - Encaminhar ao gestor"/>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Cancelar Minuta" name="02 - Cancelar minuta e retornar para análise"/>
+        <event type="task-create">
+            <action name="upd" expression="#{tipoDocumento.set('minutaEmElaboracao',57,162)}"/>
+            <action name="upd" expression="#{modeloDocumento.set('minutaEmElaboracao',73)}"/>
+        </event>
+        <event type="task-end">
+            <action expression="#{not empty processoHome.idProcessoDocumento and processoHome.idProcessoDocumento &gt; 0 ? tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', processoHome.idProcessoDocumento) : tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', tramitacaoProcessualService.recuperaVariavelTarefa('textEditCombo:pajp_minuta_ato'))}"/>
+        </event>
+        <event type="task-start">
+            <action name="Condicao do lancamento temporario de movimentos" expression="#{lancadorMovimentosService.setCondicaoLancamentoMovimentosTemporarioNoFluxo('#{true}')}"/>
+        </event>
+    </task-node>
+    <node name="Cancelar Minuta">
+        <transition to="Analisar prevenção" name="Analisar prevenção"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{processoDocumentoHome.removerDocumento(processoDocumentoManager.findById(tramitacaoProcessualService.recuperaVariavel('minutaEmElaboracao')), tramitacaoProcessualService.recuperaVariavel('processo'))}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:minutaCancelada',true)}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Assinar certidão de prevenção">
+        <task name="Assinar certidão de prevenção" swimlane="Gestor Dejaux">
+            <controller>
+                <variable name="Processo_Fluxo_revisarMinuta" mapped-name="frame:Processo_Fluxo_revisarMinuta" access="read,write"/>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame que permita a assinatura de um ou mais documentos existentes previamente preparados e cujos identificadores estejam armazenados na variável pje:fluxo:documento:minutas.
+Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na situação em que houver mais de um documento para o mesmo processo e na situação em que houver documentos de processos diversos, este frame deverá ser capaz de tolerar a assinatura em lote.]]></description>
+        <transition to="Minutar certidão de prevenção" name="01 - Retornar a certidão para correção"/>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Cancelar Minuta" name="02 -Cancelar a minuta e retornar para análise"/>
+        <transition to="Gerar andamento" name="03 - Gerar andamento">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('03 - Gerar andamento')}"/>
+            <action name="upd" expression="#{tipoDocumento.set('Processo_Fluxo_revisarMinuta',57,162)}"/>
+            <action expression="#{modeloDocumento.set('Processo_Fluxo_revisarMinuta',73)}"/>
+        </event>
+        <event type="task-end">
+            <action expression="#{not empty processoHome.idProcessoDocumento and processoHome.idProcessoDocumento &gt; 0 ? tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', processoHome.idProcessoDocumento) : tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', tramitacaoProcessualService.recuperaVariavelTarefa('textEditCombo:Processo_Fluxo_revisarMinuta'))}"/>
+        </event>
+    </task-node>
+    <node name="Gerar andamento">
+        <transition to="Término" name="Término"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(60).comComplementoDeCodigo(4).doTipoDominio().preencherComElementoDeCodigo(8110001).lancarMovimento()}"/>
+        </event>
+    </node>
+    <end-state name="Término">
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('atoordinatorio')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('minutaEmElaboracao')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('MovimentosLancadosTemporariamente')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('AgrupamentosLancadosTemporariamente')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:id:jurisdicao:selecionada')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:id:jurisdicao:alterada')}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Analisar prevenção">
+        <task name="Nó de Desvio - Analisar prevenção" swimlane="Nó de Desvio - Analisar prevenção"/>
+        <transition to="Minutar certidão de prevenção" name="Minutar certidão de prevenção"/>
+        <transition to="Assinar certidão de prevenção" name="Assinar certidão de prevenção"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Analisar prevenção" name="Analisar prevenção"/>
+        <transition to="Validar inexistência de prevenção" name="Validar inexistência de prevenção"/>
+        <transition to="[AP] - Selecionar jurisdição para redistribuir" name="[AP] - Selecionar jurisdição para redistribuir"/>
+        <transition to="[AP] - Redistribuir processo" name="[AP] - Redistribuir processo"/>
+        <transition to="[AP] - Triagem" name="[AP] - Triagem"/>
+    </task-node>
+    <task-node end-tasks="true" name="Analisar prevenção">
+        <task name="Analisar prevenção" swimlane="Analista Dejaux"/>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Minutar certidão de prevenção" name="01 - Minutar certidão de prevenção"/>
+        <transition to="Validar inexistência de prevenção" name="02 - Validar inexistência de prevenção"/>
+        <transition to="[AP] - Selecionar jurisdição para redistribuir" name="03 - Redistribuir o processo"/>
+    </task-node>
+    <task-node end-tasks="true" name="Validar inexistência de prevenção">
+        <task name="Validar inexistência de prevenção" swimlane="Gestor Dejaux"/>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="01 - Confirmar inexistência de prevenção"/>
+        <transition to="Analisar prevenção" name="02 - Retornar para análise"/>
+    </task-node>
+    <task-node end-tasks="true" name="[AP] - Selecionar jurisdição para redistribuir">
+        <task name="[AP] - Selecionar jurisdição para redistribuir" swimlane="Analista Dejaux">
+            <controller>
+                <variable name="aviso" mapped-name="textAlert:aviso" access="read,write"/>
+                <variable name="combo_jurisdicao" mapped-name="combo_objetos:combo_jurisdicao" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Analisar prevenção" name="02 - Voltar para tarefa anterior"/>
+        <transition to="[AP] - Alterar jurisdição" name="01 - Selecionar motivo de redistribuição"/>
+        <transition to="Término" name="03 - Encaminhar para secretaria"/>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual', tramitacaoProcessualService.recuperaProcesso().getJurisdicao().getIdJurisdicao())}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:id:jurisdicao:selecionada')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:tjmt:fluxo:id:jurisdicao:alterada')}"/>
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.deleteVariable('combo_objetos:combo_jurisdicao')}"/>
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:codigo:jurisdicao:selecionada', tramitacaoProcessualService.recuperaVariavelTarefa('combo_objetos:combo_jurisdicao'))}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[AP] - Redistribuir processo')}"/>
+        </event>
+    </task-node>
+    <node name="[AP] - Alterar jurisdição">
+        <transition to="[AP] - Tramitar após alteração da jurisdição" name="[AP] - Tramitar após alteração da jurisdição"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:id:jurisdicao:selecionada', (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual') eq null ? tramitacaoProcessualService.recuperaProcesso().getJurisdicao().getIdJurisdicao() : jurisdicaoManager.getJurisdicoesAtivas().{j|j.jurisdicao == (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:codigo:jurisdicao:selecionada')) ? j.idJurisdicao : 0}.toString().replace('[','').replace(',','').replace('0','').replace(']','').trim()))}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:id:jurisdicao:alterada', (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual') eq null ? tramitacaoProcessualService.recuperaProcesso().getJurisdicao().getIdJurisdicao() :  (tramitacaoProcessualService.recuperaProcesso().getJurisdicao() == jurisdicaoManager.findByIdJurisdicao(tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual')) ? tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:selecionada') : tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:atual'))))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setJurisdicao(jurisdicaoManager.findByIdJurisdicao(tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:id:jurisdicao:alterada')))}"/>
+            <action expression="#{processoJudicialAction.gravarObjeto()}"/>
+        </event>
+    </node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida')}" name="[AP] - Tramitar após alteração da jurisdição">
+        <transition to="[AP] - Selecionar jurisdição para redistribuir" name="[AP] - Selecionar jurisdição para redistribuir"/>
+        <transition to="[AP] - Redistribuir processo" name="[AP] - Redistribuir processo"/>
+    </decision>
+    <task-node end-tasks="true" name="[AP] - Redistribuir processo">
+        <task name="[AP] - Redistribuir processo" swimlane="Analista Dejaux">
+            <controller>
+                <variable name="Processo_Fluxo_abaRedistribuicaoProcesso" mapped-name="frame:Processo_Fluxo_abaRedistribuicaoProcesso" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Analisar prevenção" name="Nó de Desvio - Analisar prevenção">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="Término">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="[AP] - Tramitar após alteração da jurisdição" name="01 - Voltar para tarefa anterior"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{taskInstanceUtil.setFrameDefaultTransition('Término')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[AP] - Selecionar jurisdição para redistribuir')}"/>
+        </event>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
