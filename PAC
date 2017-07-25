@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Preparar ato de comunicação"> 
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Preparar ato de comunicação">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>
+    <swimlane name="Secretaria - Preparação e Publicação de Atos">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('199:5483,197:1338,201:1338,202:5483')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Secretaria - Preparação e Publicação de Atos"/>
+        <transition to="[PAC] - Encaminhado pelo miniPac?" name="[PAC] - Encaminhado pelo miniPac?"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fp2:id:ultimoMovimento')}"/>
+        </event>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Preparar comunicação">
+        <task name="Preparar comunicação" swimlane="Secretaria - Preparação e Publicação de Atos">
+            <controller>
+                <variable name="Processo_Fluxo_prepararExpediente" mapped-name="frame:Processo_Fluxo_prepararExpediente" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="ForkComunicação" name="ForkComunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="Não intimar"/>
+        <transition to="Nó de Desvio - Preparar ato de comunicação" name="Nó de Desvio - Preparar ato de comunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('ForkComunicação')}"/>
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('tiposDisponiveisIds','32,60,64,65,69,71,74,93,96,97,98,99,107,123,126,168,256,268,269,270')}"/>
+            <action name="upd" expression="#{preparaAtoComunicacaoAction.setMeiosComunicacao('E,C,M,P')}"/>
+        </event>
+    </task-node>
+    <fork name="ForkComunicação">
+        <transition to="É DJE?" name="É DJE?"/>
+        <transition to="É Mandado?" name="Publicar DJE"/>
+        <transition to="É Correio?" name="É Correio?"/>
+        <transition to="É Carta?" name="É Carta?"/>
+        <transition to="É Sistema?" name="É Sistema?"/>
+    </fork>
+    <decision expression="#{comunicacaoProcessualAction.getExpedientesEletronico().size() &gt; 0 ? 'Encaminhar Via Sistema' : 'JoinComunicacao'}" name="É Sistema?">
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+        <transition to="Encaminhar Via Sistema" name="Encaminhar Via Sistema"/>
+    </decision>
+    <node name="Encaminhar Via Sistema">
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+        <event type="node-enter">
+            <action expression="#{comunicacaoProcessualAction.enviarExpedientesLancarMovimentos('E', 'processoExpedienteAtual', '#{preencherMovimento.deCodigo(60).associarAoDocumento(processoExpedienteAtual.getProcessoDocumento()).comComplementoDeCodigo(4).doTipoDominio().preencherComElementoDeCodigo(80).lancarMovimento()}')}"/>
+        </event>
+    </node>
+    <decision expression="#{comunicacaoProcessualAction.getExpedientesDiario().size() &gt; 0 ? 'Publicar DJE' : 'JoinComunicacao'}" name="É DJE?">
+        <transition to="Publicar DJE" name="Publicar DJE"/>
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+    </decision>
+    <task-node end-tasks="true" name="Publicar DJE">
+        <task name="Publicar DJE" swimlane="Secretaria - Preparação e Publicação de Atos">
+            <controller>
+                <variable name="aviso" mapped-name="textAlert:aviso" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Preparar ato de comunicação" name="Nó de Desvio - Preparar ato de comunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Finalizar publicação no DJE" name="01 - Publicar"/>
+        <transition to="JoinComunicacao" name="02 - Não publicar"/>
+    </task-node>
+    <decision expression="#{comunicacaoProcessualAction.getExpedientesMandados().size() &gt; 0 ? 'Tem uma Central?' : 'JoinComunicacao'}" name="É Mandado?">
+        <description><![CDATA[]]></description>
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+        <transition to="Tem uma Central?" name="Tem uma Central?"/>
+    </decision>
+    <decision expression="#{conectorMandados.haVariasCentraisMandado() ? 'Selecionar Central de Mandado' : 'Encaminhar Central Mandados'}" name="Tem uma Central?">
+        <transition to="Encaminhar Central Mandados" name="Encaminhar Central Mandados"/>
+        <transition to="Selecionar Central de Mandado" name="Selecionar Central de Mandado"/>
+    </decision>
+    <task-node end-tasks="true" name="Selecionar Central de Mandado">
+        <task name="Selecionar Central de Mandado" swimlane="Secretaria - Preparação e Publicação de Atos">
+            <controller>
+                <variable name="Processo_Fluxo_expedientes_centralmandados" mapped-name="frame:Processo_Fluxo_expedientes_centralmandados" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[]]></description>
+        <transition to="Encaminhar Central Mandados" name="Encaminhar Central Mandados"/>
+        <transition to="Nó de Desvio - Preparar ato de comunicação" name="Nó de Desvio - Preparar ato de comunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action name="upd" expression="#{taskInstanceUtil.setFrameDefaultTransition('Encaminhar Central Mandados')}"/>
+        </event>
+    </task-node>
+    <node name="Encaminhar Central Mandados">
+        <transition to="JoinComunicacao" name="Concluir"/>
+        <event type="node-enter">
+            <action expression="#{comunicacaoProcessualAction.enviarExpedientesLancarMovimentos('M', 'processoExpedienteAtual', '#{preencherMovimento.deCodigo(60).associarAoDocumento(processoExpedienteAtual.getProcessoDocumento()).comComplementoDeCodigo(4).doTipoDominio().preencherComElementoDeCodigo(78).lancarMovimento()}')}"/>
+        </event>
+    </node>
+    <decision expression="#{comunicacaoProcessualAction.getExpedientesCorreios().size() &gt; 0 ? 'Imprimir Correspondência' : 'JoinComunicacao'}" name="É Correio?">
+        <transition to="Imprimir Correspondência" name="Imprimir Correspondência"/>
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+    </decision>
+    <task-node end-tasks="true" name="Imprimir Correspondência">
+        <task name="Imprimir Correspondência" swimlane="Secretaria - Preparação e Publicação de Atos">
+            <controller>
+                <variable name="Processo_Fluxo_abaProcessoExpedienteCorreios" mapped-name="page:Processo_Fluxo_abaProcessoExpedienteCorreios" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="JoinComunicacao" name="Concluir"/>
+        <transition to="Nó de Desvio - Preparar ato de comunicação" name="Nó de Desvio - Preparar ato de comunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{comunicacaoProcessualAction.enviarExpedientesLancarMovimentos('C', 'processoExpedienteAtual', '#{preencherMovimento.deCodigo(60).associarAoDocumento(processoExpedienteAtual.getProcessoDocumento()).comComplementoDeCodigo(4).doTipoDominio().preencherComElementoDeCodigo(74).lancarMovimento()}')}"/>
+        </event>
+        <event type="task-create">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <decision expression="#{comunicacaoProcessualAction.getExpedientesPrecatorias().size() &gt; 0 ? 'Encaminhar Carta' : 'JoinComunicacao'}" name="É Carta?">
+        <transition to="Encaminhar Carta" name="Encaminhar Carta"/>
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+    </decision>
+    <task-node end-tasks="true" name="Encaminhar Carta">
+        <task name="Encaminhar Carta" swimlane="Secretaria - Preparação e Publicação de Atos">
+            <controller>
+                <variable name="Processo_Fluxo_abaProcessoExpedienteCartas" mapped-name="page:Processo_Fluxo_abaProcessoExpedienteCartas" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="JoinComunicacao" name="Concluir"/>
+        <transition to="Nó de Desvio - Preparar ato de comunicação" name="Nó de Desvio - Preparar ato de comunicação">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-start">
+            <action name="Condicao do lancamento temporario de movimentos" expression="#{lancadorMovimentosService.setCondicaoLancamentoMovimentosTemporarioNoFluxo('#{false}')}"/>
+        </event>
+    </task-node>
+    <join name="JoinComunicacao">
+        <transition to="Término" name="Término"/>
+    </join>
+    <end-state name="Término">
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:expedienteMiniPac',false)}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Preparar ato de comunicação">
+        <task name="Nó de Desvio - Preparar ato de comunicação" swimlane="Nó de Desvio - Preparar ato de comunicação"/>
+        <transition to="Preparar comunicação" name="Preparar comunicação"/>
+        <transition to="Publicar DJE" name="Publicar DJE"/>
+        <transition to="Selecionar Central de Mandado" name="Selecionar Central de Mandado"/>
+        <transition to="Imprimir Correspondência" name="Imprimir Correspondência"/>
+        <transition to="Encaminhar Carta" name="Encaminhar Carta"/>
+        <transition to="Término" name="Término"/>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:expedienteMiniPac') ? 'ForkComunicação': 'Preparar comunicação'}" name="[PAC] - Encaminhado pelo miniPac?">
+        <transition to="Preparar comunicação" name="Preparar comunicação"/>
+        <transition to="ForkComunicação" name="ForkComunicação"/>
+    </decision>
+    <node name="Finalizar publicação no DJE">
+        <transition to="JoinComunicacao" name="JoinComunicacao"/>
+        <event type="node-leave">
+            <action name="upd" expression="#{comunicacaoProcessualAction.enviarExpedientesLancarMovimentos('P', 'processoExpedienteAtual', '#{preencherMovimento.deCodigo(60).associarAoDocumento(processoExpedienteAtual.getProcessoDocumento()).comComplementoDeCodigo(4).doTipoDominio().preencherComElementoDeCodigo(80).lancarMovimento()}')}"/>
+        </event>
+    </node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
