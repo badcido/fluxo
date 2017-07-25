@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Vinculação de Revisor">
+    <description><![CDATA[aaaaaa]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Vinculação de Revisor">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:1338')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('4:1469,7:1469')}" actor-id="#{actor.id}"/>
+    </swimlane>
+    <swimlane name="Secretaria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Magistrado"/>
+        <transition to="Verificar se Vinculação Revisor já Registrada" name="Verificar se Vinculação Revisor já Registrada"/>
+    </start-state>  
+    <!-- NODES -->
+    <decision expression="#{tramitacaoProcessualService.recuperaProcesso().getRevisado() ? 'Término' : 'Verificar se Revisor'}" name="Verificar se Vinculação Revisor já Registrada">
+        <transition to="Término" name="Término"/>
+        <transition to="Verificar se Revisor" name="Verificar se Revisor"/>
+    </decision>
+    <decision expression="#{(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorRevisor() != null and authenticator.getUsuarioLocalizacaoMagistradoServidorAtual().getOrgaoJulgador() != null and tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorRevisor().equals(authenticator.getUsuarioLocalizacaoMagistradoServidorAtual().getOrgaoJulgador()) and authenticator.getUsuarioLocalizacaoMagistradoServidorAtual().getMagistradoTitular()) ? 'Verifica se Revisor Juiz Substituto' : 'Vincular Revisor'}" name="Verificar se Revisor">
+        <transition to="Vincular Revisor" name="Vincular Revisor"/>
+        <transition to="Verifica se Revisor Juiz Substituto" name="Verifica se Revisor Juiz Substituto"/>
+    </decision>
+    <decision expression="#{(authenticator.getUsuarioLocalizacaoMagistradoServidorAtual().getOrgaoJulgadorCargo() != null and usuarioLocalizacaoMagistradoServidorManager.isLocalizacaoDeMagistradoAuxiliar(authenticator.getUsuarioLocalizacaoMagistradoServidorAtual(), tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorRevisor())) ? 'Verifica Órgão Julgador Revisor Destino' : 'Carregar Lista de Órgãos Revisor'}" name="Verifica se Revisor Juiz Substituto">
+        <transition to="Carregar Lista de Órgãos Revisor" name="Carregar Lista de Órgãos Revisor"/>
+        <transition to="Verifica Órgão Julgador Revisor Destino" name="Verifica Órgão Julgador Revisor Destino"/>
+    </decision>
+    <node name="Carregar Lista de Órgãos Revisor">
+        <transition to="Escolher Órgão Julgador Revisor Destino" name="Escolher Órgão Julgador Revisor Destino"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('listaOrgaosDestinoRevisor',orgaoJulgadorHome.getOrgaoJulgadorListByOjc(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado()))}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('revisorOrigemSecretaria',true)}"/>
+        </event>
+    </node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('listaOrgaosDestinoRevisor').size() == 1 ? 'Deslocar Revisor Processo': 'Escolher Órgão Julgador Revisor Destino' }" name="Verifica Órgão Julgador Revisor Destino">
+        <transition to="Escolher Órgão Julgador Revisor Destino" name="Escolher Órgão Julgador Revisor Destino"/>
+        <transition to="Deslocar Revisor Processo" name="Deslocar Revisor Processo"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('listaOrgaosDestinoRevisor',usuarioLocalizacaoMagistradoServidorManager.recuperaLocalizacaoDeOrgaosResponsavel(authenticator.getUsuarioLogado().getIdUsuario(),tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado()))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaVariavel('listaOrgaosDestinoRevisor').size() == 1 ? tramitacaoProcessualService.gravaVariavel('localizacaoMagistradoRevisorDestino',tramitacaoProcessualService.recuperaVariavel('listaOrgaosDestinoRevisor').get(0)) :tramitacaoProcessualService.apagaVariavel('localizacaoMagistradoRevisorDestino')}"/>
+        </event>
+    </decision>
+    <task-node end-tasks="true" name="Escolher Órgão Julgador Revisor Destino">
+        <task name="Escolher Órgão Julgador Revisor Destino" swimlane="Secretaria">
+            <controller>
+                <variable name="avisoRevisor" mapped-name="textAlert:avisoRevisor" access="read,write"/>
+                <variable name="localizacaoMagistradoRevisorDestino" mapped-name="combo_objetos:localizacaoMagistradoRevisorDestino" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Vinculação de Revisor" name="Nó de Desvio - Vinculação de Revisor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Verificar se Vinculação Revisor já Registrada" name="02 - Verificar se o revisor está registrado">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Validar Órgão Julgador Revisor" name="01 - Continuar">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="01 - Aguardar Sessão"/>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:vr:orgaoJulgadorSelecionado', tramitacaoProcessualService.recuperaVariavelTarefa('combo_objetos:localizacaoMagistradoRevisorDestino'))}"/>
+        </event>
+        <event type="task-start">
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('localizacaoMagistradoRevisorDestino')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel(&quot;pje:tjmt:fluxo:processo:atual&quot;, tramitacaoProcessualService.recuperaProcesso())}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel(&quot;pje:tjmt:fluxo:processo:orgaoJulgador&quot;, tramitacaoProcessualService.recuperaVariavel(&quot;pje:tjmt:fluxo:processo:atual&quot;).orgaoJulgador)}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel(&quot;pje:tjmt:fluxo:processo:orgaoJulgadorColegiado&quot;, tramitacaoProcessualService.recuperaVariavel(&quot;pje:tjmt:fluxo:processo:atual&quot;).orgaoJulgadorColegiado)}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel(&quot;pje:tjmt:fluxo:processo:orgaoJulgadorCargo&quot;, tramitacaoProcessualService.recuperaVariavel(&quot;pje:tjmt:fluxo:processo:atual&quot;).orgaoJulgadorCargo)}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel(&quot;pje:tjmt:fluxo:processo:jurisdicao&quot;, tramitacaoProcessualService.recuperaVariavel(&quot;pje:tjmt:fluxo:processo:atual&quot;).jurisdicao)}"/>
+        </event>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('localizacaoMagistradoRevisorDestino') == null ? 'Mensagem Validação Revisor' : 'Confirmar Revisor' }" name="Validar Órgão Julgador Revisor">
+        <transition to="Mensagem Validação Revisor" name="Mensagem Validação Revisor"/>
+        <transition to="Confirmar Revisor" name="Confirmar Revisor"/>
+    </decision>
+    <task-node end-tasks="true" name="Mensagem Validação Revisor">
+        <task name="Mensagem Validação Revisor" swimlane="Secretaria">
+            <controller>
+                <variable name="msgAlertaRevisor" mapped-name="textAlert:msgAlertaRevisor" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Escolher Órgão Julgador Revisor Destino" name="01 - Continuar"/>
+        <transition to="Nó de Desvio - Vinculação de Revisor" name="Nó de Desvio - Vinculação de Revisor">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Confirmar Revisor">
+        <task name="Confirmar Revisor" swimlane="Secretaria">
+            <controller>
+                <variable name="msgConfirmacaoRevisor" mapped-name="textAlert:msgConfirmacaoRevisor" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Escolher Órgão Julgador Revisor Destino" name="02 - Escolher revisor"/>
+        <transition to="Nó de Desvio - Vinculação de Revisor" name="Nó de Desvio - Vinculação de Revisor">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Deslocar Revisor Processo" name="01 - Confirmar"/>
+    </task-node>
+    <node name="Deslocar Revisor Processo">
+        <transition to="Vincular Revisor" name="Vincular Revisor"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgadorRevisor(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:vr:orgaoJulgadorSelecionado'))}"/>
+        </event>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('localizacaoMagistradoRevisorDestino')}"/>
+        </event>
+    </node>
+    <node name="Vincular Revisor">
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{processoJudicialService.registrarVinculacaoDoRevisorAoProcesso(tramitacaoProcessualService.recuperaProcesso())}"/>
+        </event>
+    </node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Vinculação de Revisor">
+        <task name="Nó de Desvio - Vinculação de Revisor" swimlane="Secretaria"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Escolher Órgão Julgador Revisor Destino" name="Escolher Órgão Julgador Revisor Destino"/>
+        <transition to="Mensagem Validação Revisor" name="Mensagem Validação Revisor"/>
+        <transition to="Confirmar Revisor" name="Confirmar Revisor"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
