@@ -156,7 +156,7 @@ Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na s
         </event>
         <event type="node-leave">
             <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:codigo:jurisdicao:selecionada', tramitacaoProcessualService.recuperaVariavelTarefa('combo_objetos:combo_jurisdicao'))}"/>
-            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[AP] - Redistribuir processo')}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[FR] - Redistribuir processo')}"/>
         </event>
     </task-node>
     <node name="[AP] - Alterar jurisdição">
@@ -170,7 +170,7 @@ Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na s
     </node>
     <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida')}" name="[AP] - Tramitar após alteração da jurisdição">
         <transition to="[AP] - Selecionar jurisdição para redistribuir" name="[AP] - Selecionar jurisdição para redistribuir"/>
-        <transition to="[AP] - Redistribuir processo" name="[AP] - Redistribuir processo"/>
+        <transition to="[FR] - Redistribuir processo" name="[FR] - Redistribuir processo"/>
     </decision>
     <task-node end-tasks="true" name="[AP] - Redistribuir processo">
         <task name="[AP] - Redistribuir processo" swimlane="Analista Dejaux">
@@ -191,7 +191,17 @@ Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na s
         <event type="node-leave">
             <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[AP] - Selecionar jurisdição para redistribuir')}"/>
         </event>
-    </task-node>  
+    </task-node>
+    <process-state name="[FR] - Redistribuir processo">
+        <sub-process name="Fluxo de redistribuição" binding="late"/>
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Término')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida','[AP] - Selecionar jurisdição para redistribuir')}"/>
+        </event>
+    </process-state>  
     <!-- PROCESS-EVENTS -->
     <event type="node-enter">
         <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
@@ -243,3 +253,4 @@ Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na s
     </event>  
     <!-- ACTIONS --> 
 </process-definition>
+
