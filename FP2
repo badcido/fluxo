@@ -1,0 +1,811 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Fluxo processual 2 Grau"> 
+    <!-- SWIMLANES -->
+    <swimlane name="Dejaux">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:5894')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Fluxo processual 2 Grau">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Assessoria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('6:5197,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('7:1469')}"/>
+    </swimlane>
+    <swimlane name="Secretaria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial">
+            <controller/>
+        </task>
+        <transition to="Distribuir processo?" name="Distribuir processo?"/>
+    </start-state>  
+    <!-- NODES -->
+    <decision expression="#{parametroService.valueOf('pje:tjmt:distribuir:processo') ? 'Evoluiu classe?' : 'Término'}" name="Distribuir processo?">
+        <transition to="Evoluiu classe?" name="Evoluiu classe?"/>
+        <transition to="Término" name="Término"/>
+    </decision>
+    <decision expression="#{(processoTrfHome.getDataDistribuicao().substring(6,10)).concat(processoTrfHome.getDataDistribuicao().substring(3,5)).concat(processoTrfHome.getDataDistribuicao().substring(0,2)).equals((currentDate).toString().replace('-','')) ? 'Recupera Classe Judicial' : 'Verificar custa'}" name="Evoluiu classe?">
+        <description><![CDATA[Criado em: 23/08/2016. Objetivo: Comparar a data da distribuição com a data atual, para transitar os processos a tarefa "Análise de prevenção" somente os que não forem de alteração de classe.]]></description>
+        <transition to="Recupera Classe Judicial" name="Recupera Classe Judicial"/>
+        <transition to="Verificar custa" name="Verificar custa"/>
+    </decision>
+    <node name="Recupera Classe Judicial">
+        <transition to="Verifica o tipo de recurso" name="Verifica o tipo de recurso"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fp2:idClasseProcessual')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fp2:idClasseProcessual', processoTrfHome.instance.classeJudicial.codClasseJudicial.toString())}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Intimar Ministério Público">
+        <task name="Intimar Ministério Público" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Intimar ou Citar" name="01 - Intimar ou Citar"/>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaProcesso().competencia.getIdCompetencia() != 21 ? 'Distribuido no recesso forense?' : (parametroService.valueOf('tjmt:pje:fluxo:turmaRecursal:classe:tarefa:triagem').contains(&quot;[&quot;.concat(tramitacaoProcessualService.recuperaVariavel('pje:fp2:idClasseProcessual')).concat(&quot;]&quot;)) ? 'Verificar custas' : 'Registrar variável segundo grau [BC2G]')}" name="Verifica o tipo de recurso">
+        <description><![CDATA[Atualizado em: 23/08/2016. Objetivo: Alterado o nome do parâmetro 'classeJudicialQVaiDiretoParaTriagem. para'tjmt:pje:fluxo:turmaRecursal:classe:tarefa:triagem'.
+
+Atualizado em: 15/08/2016. Objetivo: Todos os processos protocolados e distribuídos serão transitados direto para a caixa "Análise de prevenção".]]></description>
+        <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
+        <transition to="Verificar custa" name="Verificar custa"/>
+        <transition to="Distribuido no recesso forense?" name="Distribuido no recesso forense?"/>
+    </decision>
+    <end-state name="Término"/>
+    <node name="Registrar variável segundo grau [BC2G]">
+        <transition to="Registrar conclusão (decisão) [BC2G]" name="Registrar conclusão (decisão) [BC2G]"/>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:segundoGrau',(!(processoTrfHome.getInstance().getJurisdicao().getJurisdicao().equals('Turmas Recursais - JEC'))))}"/>
+        </event>
+    </node>
+    <node name="Registrar conclusão (decisão) [BC2G]">
+        <transition to="Verificar urgência (inicial) [BC2G]" name="Verificar urgência (inicial)"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(6).lancarMovimento()}"/>
+        </event>
+    </node>
+    <decision expression="#{tramitacaoProcessualService.sigiloso() or tramitacaoProcessualService.temUrgencia() ? 'Conferência inicial (urgência)' : 'Conferência inicial'}" name="Verificar urgência (inicial) [BC2G]">
+        <transition to="Triagem inicial urgente" name="Conferência inicial (urgência)"/>
+        <transition to="Triagem inicial" name="Conferência inicial"/>
+    </decision>
+    <task-node end-tasks="true" name="Triagem inicial">
+        <task name="Triagem inicial" swimlane="Assessoria">
+            <controller>
+                <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
+                <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
+                <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Cria variável decisão (urgência) [BC2G]" name="01 - Minutar decisão (urgência)"/>
+        <transition to="Cria variável decisão [BC2G]" name="02 - Minutar decisão monocrática"/>
+        <transition to="Cria variável de admissibilidade" name="03 - Minutar decisão de admissibilidade"/>
+        <transition to="Cria variável despacho [BC2G]" name="04 - Minutar despacho ou decisão"/>
+        <transition to="Preparar relatório ou voto " name="05 - Preparar relatório ou voto "/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem inicial urgente" name="06 - Triagem inicial urgente"/>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('observacaoProcessualDaTriagem', txtObservacao)}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('mostrarBotaoGravarNoFluxo','false')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:flx:paginaExterna', parametroService.valueOf('tjmt:consulta:guia').concat(tramitacaoProcessualService.recuperaProcesso()))}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Triagem inicial urgente">
+        <task name="Triagem inicial urgente" swimlane="Assessoria">
+            <controller>
+                <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
+                <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
+                <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Cria variável decisão (urgência) [BC2G]" name="01 - Minutar decisão (urgência)"/>
+        <transition to="Cria variável decisão [BC2G]" name="02 - Minutar decisão monocratica"/>
+        <transition to="Cria variável de admissibilidade" name="03 - Minutar decisão de admissibilidade"/>
+        <transition to="Cria variável despacho [BC2G]" name="04 - Minutar despacho ou decisão"/>
+        <transition to="Preparar relatório ou voto " name="05 - Preparar relatório ou voto "/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem inicial" name="06 - Triagem inicial"/>
+        <event type="task-create">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('mostrarBotaoGravarNoFluxo','false')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:flx:paginaExterna', parametroService.valueOf('tjmt:consulta:guia').concat(tramitacaoProcessualService.recuperaProcesso()))}"/>
+        </event>
+    </task-node>
+    <node name="Cria variável decisão [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar decisão monocrática')}"/>
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.deleteVariable('pje:pajp:minutarVoto')}"/>
+        </event>
+    </node>
+    <node name="Cria variável decisão (urgência) [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar decisão urgente')}"/>
+        </event>
+    </node>
+    <node name="Cria variável despacho [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar despacho ou decisão')}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Analise de Recurso Repetitivo">
+        <task name="Analise de Recurso Repetitivo" swimlane="Assessoria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Registrar conclusão para decisão (urgência) [BC2G]" name="02 - Conclusão para decisão (urgência)"/>
+        <transition to="Registrar conclusão para despacho [BC2G]" name="03 - Conclusão para despacho"/>
+        <transition to="Registrar conclusão para decisão [BC2G]" name="01 - Conclusão para decisão"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="04 - Devolver ao orgão de origem">
+            <condition expression="#{empty tramitacaoProcessualService.recuperaVariavel('pje:fluxo:identificador:orgaoOrigemRV')}"/>
+        </transition>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('origemPAJ',4)}"/>
+        </event>
+    </task-node>
+    <node name="Registrar conclusão para decisão (urgência) [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(6).lancarMovimento()}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar decisão urgente')}"/>
+        </event>
+    </node>
+    <node name="Registrar conclusão para despacho [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-enter">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(5).lancarMovimento()}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar despacho ou decisão')}"/>
+        </event>
+    </node>
+    <node name="Registrar conclusão para decisão [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-enter">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(6).lancarMovimento()}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar decisão monocrática')}"/>
+        </event>
+    </node>
+    <process-state name="Preparar ato judicial [BC2G]">
+        <sub-process name="Preparar ato judicial de 2º Grau" binding="late"/>
+        <transition to="Minutar voto?" name="Minutar voto?"/>
+    </process-state>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:pajp:minutarVoto') ? 'Preparar relatório ou voto ' : 'Registrar variável origem primeiro grau [BC2G]'}" name="Minutar voto?">
+        <transition to="Registrar variável origem primeiro grau [BC2G]" name="Registrar variável origem primeiro grau [BC2G]"/>
+        <transition to="Preparar relatório ou voto " name="Preparar relatório ou voto "/>
+    </decision>
+    <node name="Registrar variável origem primeiro grau [BC2G]">
+        <transition to="Existe andamentos 11975 ou 265?" name="Existe andamentos 11975 ou 265?"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fp2:id:ultimoMovimento',  processoJudicialService.recuperarUltimoMovimento(tramitacaoProcessualService.recuperaProcesso()).evento.getCodEvento())}"/>
+        </event>
+        <event type="node-leave">
+            <action name="upd" expression="#{empty tramitacaoProcessualService.recuperaVariavel('pje:fluxo:origemPrimeiroGrau') ? (tramitacaoProcessualService.gravaVariavel('pje:fluxo:origemPrimeiroGrau',processoHome.verificaEvento(processoTrfHome.instance.processo,(processoHome.getEventosAgrupamento('Recebido os autos').get(0))))) : false}"/>
+        </event>
+    </node>
+    <process-state name="Cumprir decisão [BC2G]">
+        <sub-process name="Cumprir decisão em 2º Grau" binding="late"/>
+        <transition to="Triagem" name="Triagem"/>
+    </process-state>
+    <task-node end-tasks="true" name="Triagem">
+        <task name="Triagem" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Atualizado: 25/07/2016
+Objetivo: Incluindo transição para vice-presidencia]]></description>
+        <transition to="Aguardar paradigma do STJ ou STF" name="01 - Aguardar paradigma do STJ ou STF"/>
+        <transition to="Registrar conclusão para despacho [BC2G]" name="04 - Conclusão para despacho"/>
+        <transition to="Registrar conclusão para decisão [BC2G]" name="02 - Conclusão para decisão"/>
+        <transition to="Registrar conclusão para decisão (urgência) [BC2G]" name="03 - Conclusão para decisão (urgência)"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="07 - Devolver ao orgão de origem">
+            <condition expression="#{(processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador == parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia ')) or (processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado == parametroService.valueOf('tjmt:idOrgaoJulgadorColegiado:VicePresidencia'))}"/>
+        </transition>
+        <transition to="Evoluir classe" name="05 - Corrigir classe"/>
+        <transition to="Encaminhar para diligência" name="08 - Encaminhar para diligência"/>
+        <transition to="Cumprir decisão [BC2G]" name="06 - Cumprir decisão"/>
+        <transition to="Verificar se houve trânsito em julgado" name="10 - Verificar se houve trânsito em julgado"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Preparar relatório ou voto " name="11 - Preparar relatório ou voto "/>
+        <transition to="Enviar a 1ª Vice-Presidência [BC2G]" name="09 - Remeter a Vice-Presidência">
+            <condition expression="#{tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador.toString() != parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia')}"/>
+        </transition>
+        <transition to="Remeter ao STF" name="12 - Remeter ao STF">
+            <condition expression="#{(processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador == parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia ')) or (processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado == parametroService.valueOf('tjmt:idOrgaoJulgadorColegiado:VicePresidencia'))}"/>
+        </transition>
+        <transition to="Remeter ao STJ" name="13 - Remeter ao STJ">
+            <condition expression="#{(processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador == parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia ')) or (processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado == parametroService.valueOf('tjmt:idOrgaoJulgadorColegiado:VicePresidencia'))}"/>
+        </transition>
+        <transition to="[FP2] - Analisar prevenção" name="14 - Analisar prevenção">
+            <condition expression="#{tramitacaoProcessualService.recuperaProcesso().getJurisdicao().getIdJurisdicao() == parametroService.valueOf('pje:tjmt:codigo:recesso:forense') ? true : false}"/>
+        </transition>
+        <transition to="Enviar a Presidência [BC2G]" name="15 - Remeter a Presidência">
+            <condition expression="#{tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador.toString() != parametroService.valueOf('tjmt:idOrgaoJulgador:Presidencia')}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('origemPAJ',5)}"/>
+        </event>
+        <event type="task-create">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar paradigma do STJ ou STF">
+        <task name="Aguardar paradigma do STJ ou STF" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="01 - Triagem "/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Confirmar envio a 1ª Vice-Presidência">
+        <task name="Confirmar envio a 1ª Vice-Presidência" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo básico conhecimento - segundo grau" name="Nó de Desvio - Fluxo básico conhecimento - segundo grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="02 - Triagem"/>
+    </task-node>
+    <task-node end-tasks="true" name="Confirmar a devolução ao orgão de origem">
+        <task name="Confirmar a devolução ao orgão de origem" swimlane="Secretaria"/>
+        <description><![CDATA[Atualizado: 25/07/2016
+Objetivo: Confirmar a devolução do processo para o órgão julgador de origem.]]></description>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Analisar recurso" name="01 - Analisar recurso"/>
+        <transition to="Devolver ao órgão de origem" name="02 - Devolver ao órgão de origem">
+            <condition expression="#{tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador.toString() == parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia')}"/>
+        </transition>
+    </task-node>
+    <node name="Enviar a 1ª Vice-Presidência [BC2G]">
+        <transition to="Analisar recurso" name="Analisar recurso"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:orgaoOrigem', processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:colegiadoOrigem', processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:cargoOrigem', processoTrfHome.instance.orgaoJulgadorCargo.idOrgaoJulgadorCargo)}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{processoJudicialService.deslocarOrgaoJulgador(processoTrfHome.instance, parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia'), parametroService.valueOf('tjmt:idOrgaoJulgadorColegiado:VicePresidencia'), parametroService.valueOf('tjmt:idCargoOrgaoJulgador:VicePresidencia'))}"/>
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(38).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('Vice-Presidência').lancarMovimento()}"/>
+        </event>
+    </node>
+    <node name="Enviar a Presidência [BC2G]">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:orgaoOrigem', processoTrfHome.instance.orgaoJulgador.idOrgaoJulgador)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:colegiadoOrigem', processoTrfHome.instance.orgaoJulgadorColegiado.idOrgaoJulgadorColegiado)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:identificador:cargoOrigem', processoTrfHome.instance.orgaoJulgadorCargo.idOrgaoJulgadorCargo)}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{processoJudicialService.deslocarOrgaoJulgador(processoTrfHome.instance, parametroService.valueOf('tjmt:idOrgaoJulgador:Presidencia'), parametroService.valueOf('tjmt:idOrgaoJulgadorColegiado:Presidencia'), parametroService.valueOf('tjmt:idCargoOrgaoJulgador:Presidencia'))}"/>
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('Presidência').lancarMovimento()}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Transitar em julgado">
+        <task name="Transitar em julgado" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+                <variable name="Data_do_Transito_em_Julgado" mapped-name="datePast:Data_do_Transito_em_Julgado" access="read,write"/>
+                <variable name="Certidao_do_Transito_em_Julgado" mapped-name="textEditSignature:Certidao_do_Transito_em_Julgado" access="read,write"/>
+                <variable name="tipoInicial" mapped-name="textAlert:tipoInicial" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Arquivar ou Baixar comarca?" name="Arquivar ou Baixar comarca?">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="Retornar para triagem"/>
+        <event type="node-enter">
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.setVariable('tiposDisponiveisIds', '70')}"/>
+        </event>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Arquivar ou Baixar comarca?')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:transicao:dispensaRequeridos','Retornar para triagem')}&quot;/&gt;"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Evoluir classe">
+        <task name="Evoluir classe" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+                <variable name="Processo_Fluxo_abaEvolucaoClasse" mapped-name="frame:Processo_Fluxo_abaEvolucaoClasse" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Atualizado em: 23/08/2016. Objetivo: 
+a) Corrigido para não solicitar os campos obrigatórios na saída para a tarefa de "Triagem".
+
+b) Adicionado o lançamento de movimento que demonstra a alteração da classe antiga para a classe nova.]]></description>
+        <transition to="Término" name="Término">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="01 - Triagem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:transicao:dispensaRequeridos','01 - Triagem')}"/>
+        </event>
+        <event type="task-end">
+            <action name="upd" expression="#{preencherMovimento.deCodigo(10966).comComplementoDeCodigo(26).preencherComTexto(processoTrfHome.getClasseJudicialAnterior()).comComplementoDeCodigo(27).preencherComTexto(processoTrfHome.instance.getClasseJudicial()).lancarMovimento()}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Devolver para instância de origem">
+        <task name="Devolver para instância de origem" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+                <variable name="Intercomunicacao_retornoProcesso" mapped-name="frame:Intercomunicacao_retornoProcesso" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="02 - Triagem "/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Registrar movimentação processo devolvido" name="Registrar movimentação processo devolvido">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action name="upd" expression="#{taskInstanceUtil.setFrameDefaultTransition('Registrar movimentação processo devolvido')}"/>
+        </event>
+        <event type="task-start">
+            <action expression="#{taskInstanceUtil.setVariable('comboMotivoRemessa','18;90,40,39,37')}"/>
+        </event>
+    </task-node>
+    <node name="Registrar movimentação processo devolvido">
+        <transition to="Processos baixados à instância de origem" name="Processos baixados à instância de origem"/>
+    </node>
+    <task-node end-tasks="true" name="Arquivo definitivo (Processo originário)">
+        <task name="Arquivo definitivo (Processo originário)" swimlane="Secretaria">
+            <controller/>
+        </task>
+        <transition to="Triagem" name="01 - Desarquivar"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{preencherMovimento.deCodigo(246).lancarMovimento()}"/>
+        </event>
+        <event type="task-create">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(893).lancarMovimento()}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar recurso">
+        <task name="Aguardar recurso" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="01 - Triagem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Nó de Desvio - Fluxo básico conhecimento - segundo grau">
+        <task name="Nó de Desvio - Fluxo básico conhecimento - segundo grau" swimlane="Nó de Desvio - Fluxo processual 2 Grau"/>
+        <transition to="Término" name="Término">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem inicial urgente" name="01 - Triagem inicial urgente"/>
+        <transition to="Aguardar paradigma do STJ ou STF" name="02 - Aguardar paradigma do STJ ou STF "/>
+        <transition to="Confirmar envio a 1ª Vice-Presidência" name="03 - Confirmar envio a 1ª Vice-Presidência"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="04 - Confirmar a devolução ao orgão de origem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Nó de Desvio - Fluxo processual 2 Grau">
+        <task name="Nó de Desvio - Fluxo processual 2 Grau" swimlane="Nó de Desvio - Fluxo processual 2 Grau"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Triagem inicial urgente" name="Triagem inicial urgente"/>
+        <transition to="Aguardar paradigma do STJ ou STF" name="Aguardar paradigma do STJ ou STF"/>
+        <transition to="Confirmar envio a 1ª Vice-Presidência" name="Confirmar envio a 1ª Vice-Presidência"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="Confirmar a devolução ao orgão de origem"/>
+        <transition to="Nó de Desvio - Fluxo básico conhecimento - segundo grau" name="Nó de Desvio - Fluxo básico conhecimento - segundo grau"/>
+        <transition to="Encaminhar para diligência" name="Encaminhar para diligência"/>
+        <transition to="Aguardar retorno da diligência" name="Aguardar retorno da diligência"/>
+        <transition to="Devolvido de diligência" name="Devolvido de diligência"/>
+        <transition to="Triagem" name="Triagem"/>
+        <transition to="Verificar se houve trânsito em julgado" name="Verificar se houve trânsito em julgado"/>
+        <transition to="Aguardar recurso" name="Aguardar recurso"/>
+        <transition to="Evoluir classe" name="Evoluir classe"/>
+        <transition to="Transitar em julgado" name="Transitar em julgado"/>
+        <transition to="Devolver para instância de origem" name="Devolver para instância de origem"/>
+        <transition to="Processos baixados à instância de origem" name="Processos baixados à instância de origem"/>
+        <transition to="Triagem inicial" name="Triagem inicial">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Analise de Recurso Repetitivo" name="Analise de Recurso Repetitivo"/>
+        <transition to="Arquivo definitivo (Processo originário)" name="Arquivo definitivo (Processo originário)"/>
+        <transition to="Prazo vencido" name="Prazo vencido"/>
+        <transition to="Encaminhar ao STJ (suspenso)" name="Encaminhar ao STJ (suspenso)"/>
+        <transition to="Encaminhar ao STF (sobrestado)" name="Encaminhar ao STF (sobrestado)"/>
+        <transition to="Declarado impedido, suspenso ou incompetente (Re-distribuir)" name="Declarado impedido, suspenso ou incompetente (Re-distribuir)"/>
+        <transition to="Intimar Ministério Público" name="Intimar Ministério Público"/>
+        <transition to="Analisar recurso" name="Analisar recurso"/>
+        <transition to="Remetido ao STJ" name="Remetido ao STJ"/>
+        <transition to="Remetido ao STF" name="Remetido ao STF"/>
+        <transition to="Remeter ao STF" name="Remeter ao STF"/>
+        <transition to="Remeter ao STJ" name="Remeter ao STJ"/>
+        <transition to="Verificar custa" name="Verificar custa"/>
+    </task-node>
+    <process-state name="Preparar relatório ou voto ">
+        <sub-process name="Fluxo de decisão colegiada em gabinete" binding="late"/>
+        <transition to="Secretaria ou Gabinete?" name="Secretaria ou Gabinete?"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:pje:fluxo:desvio:processo',false)}"/>
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(36).lancarMovimento()}"/>
+        </event>
+    </process-state>
+    <task-node end-tasks="true" name="Prazo vencido">
+        <task name="Prazo vencido" swimlane="Secretaria"/>
+        <transition to="Evoluir classe" name="06 - Evoluir classe "/>
+        <transition to="Cumprir decisão [BC2G]" name="04 - Cumprir decisão "/>
+        <transition to="Registrar conclusão para decisão (urgência) [BC2G]" name="08 - Registrar conclusão para decisão (urgência) "/>
+        <transition to="Registrar conclusão para despacho [BC2G]" name="09 -Registrar conclusão para despacho"/>
+        <transition to="Registrar conclusão para decisão [BC2G]" name="07 - Registrar conclusão para decisão"/>
+        <transition to="Aguardar paradigma do STJ ou STF" name="01 - Aguardar paradigma do STJ ou STF "/>
+        <transition to="Encaminhar para diligência" name="05 - Encaminhar para diligência"/>
+        <transition to="Confirmar envio a 1ª Vice-Presidência" name="03 - Confirmar envio a 1ª Vice-Presidência"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="02 - Confirmar a devolução ao orgão de origem"/>
+        <transition to="Verificar se houve trânsito em julgado" name="10 - Verificar se houve trânsito em julgado"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Encaminhar para diligência">
+        <task name="Encaminhar para diligência" swimlane="Secretaria"/>
+        <transition to="Aguardar retorno da diligência" name="01 - Aguardar retorno da diligência"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="02 - Triagem "/>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar retorno da diligência">
+        <task name="Aguardar retorno da diligência" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Devolvido de diligência" name="01 - Devolvido de diligência"/>
+    </task-node>
+    <task-node end-tasks="true" name="Devolvido de diligência">
+        <task name="Devolvido de diligência" swimlane="Secretaria"/>
+        <transition to="Registrar conclusão para decisão [BC2G]" name="01 - Registrar conclusão para decisão"/>
+        <transition to="Término" name="Término">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Verificar se houve trânsito em julgado">
+        <task name="Verificar se houve trânsito em julgado" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Aguardar recurso" name="01 - Aguardar recurso "/>
+        <transition to="Evoluir classe" name="02 - Evoluir classe "/>
+        <transition to="Triagem" name="04 - Triagem"/>
+        <transition to="Transitar em julgado" name="03 - Transitar em julgado"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Processos baixados à instância de origem">
+        <task name="Processos baixados à instância de origem" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Término" name="Término">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="01 - Desarquivar"/>
+    </task-node>
+    <process-state name="Preparar comunicação ">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Verificar saída após comunicação" name="Verificar saída após comunicação"/>
+    </process-state>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 265 or tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 11975 ? 'Preparar comunicação ':'Existe andamentos 269 ou 941?'}" name="Existe andamentos 11975 ou 265?">
+        <transition to="Preparar comunicação " name="Preparar comunicação "/>
+        <transition to="Existe andamentos 269 ou 941?" name="Existe andamentos 269 ou 941?"/>
+    </decision>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 269 or tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 941 ? 'Declarado impedido, suspenso ou incompetente (Re-distribuir)' : (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:expedienteMiniPac') ? 'Registrar variavel de comunicação quando vindo do gabinete' : 'Verificar custa')}" name="Existe andamentos 269 ou 941?">
+        <transition to="Declarado impedido, suspenso ou incompetente (Re-distribuir)" name="Declarado impedido, suspenso ou incompetente (Re-distribuir)"/>
+        <transition to="Verificar custa" name="Verificar custa"/>
+        <transition to="Registrar variavel de comunicação quando vindo do gabinete" name="Registrar variavel de comunicação quando vindo do gabinete"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fp2:id:ultimoMovimento')}"/>
+        </event>
+    </decision>
+    <task-node end-tasks="true" name="Encaminhar ao STJ (suspenso)">
+        <task name="Encaminhar ao STJ (suspenso)" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="01 - Triagem"/>
+    </task-node>
+    <task-node end-tasks="true" name="Encaminhar ao STF (sobrestado)">
+        <task name="Encaminhar ao STF (sobrestado)" swimlane="Secretaria"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="01 - Triagem"/>
+    </task-node>
+    <task-node end-tasks="true" name="Declarado impedido, suspenso ou incompetente (Re-distribuir)">
+        <task name="Declarado impedido, suspenso ou incompetente (Re-distribuir)" swimlane="Secretaria">
+            <controller>
+                <variable name="Processo_Fluxo_abaRedistribuicaoProcesso" mapped-name="frame:Processo_Fluxo_abaRedistribuicaoProcesso" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Cumprir decisão [BC2G]" name="01 - Cumprir decisão"/>
+        <event type="node-enter">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('01 - Cumprir decisão')}"/>
+        </event>
+    </task-node>
+    <decision expression="#{processoTrfHome.existeMovimentoLancadoPorIdEvento(13) ? 'Encaminhar ao STF (sobrestado)' : 'Encaminhar ao STJ (suspenso)'}" name="Suspender ou Sobrestar o processo">
+        <transition to="Encaminhar ao STJ (suspenso)" name="Encaminhar ao STJ (suspenso)"/>
+        <transition to="Encaminhar ao STF (sobrestado)" name="Encaminhar ao STF (sobrestado)"/>
+    </decision>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:relatorioVotoEmenta:saida')}" name="Secretaria ou Gabinete?">
+        <transition to="Cria variável decisão [BC2G]" name="Cria variável decisão [BC2G]"/>
+        <transition to="Cumprir decisão [BC2G]" name="Cumprir decisão [BC2G]"/>
+        <transition to="Preparar relatório ou voto " name="Preparar relatório ou voto "/>
+    </decision>
+    <node name="Cria variável de admissibilidade">
+        <transition to="Preparar ato judicial [BC2G]" name="Preparar ato judicial [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:2gpajp:tipoMinuta','Minutar decisão de admissibilidade')}"/>
+        </event>
+    </node>
+    <process-state name="Encaminhar para análise de prevenção">
+        <sub-process name="Analisar prevenção" binding="late"/>
+        <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
+    </process-state>
+    <node name="Registrar variável turma recursal">
+        <transition to="Intimar Ministério Público" name="Intimar Ministério Público"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fp2:turmaRecursal', processoTrfHome.getInstance().getJurisdicao())}"/>
+        </event>
+    </node>
+    <process-state name="Intimar ou Citar">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Cria variável de admissibilidade" name="Registrar conclusão para decisão admissibilidade"/>
+    </process-state>
+    <task-node end-tasks="true" name="Analisar recurso">
+        <task name="Analisar recurso" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarEmLote" mapped-name="movimentarLote:MovimentarEmLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Atualizado: 25/07/2016]]></description>
+        <transition to="Registrar conclusão para decisão [BC2G]" name="01 - Conclusão para decisão"/>
+        <transition to="Registrar conclusão para decisão (urgência) [BC2G]" name="02 - Conclusão para decisão urgente"/>
+        <transition to="Registrar conclusão para despacho [BC2G]" name="03 - Conclusão para despacho"/>
+        <transition to="Cria variável de admissibilidade" name="04 - Conclusão para decisão de admissibilidade"/>
+        <transition to="Confirmar a devolução ao orgão de origem" name="05 - Devolver ao órgão de origem">
+            <condition expression="#{tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador.toString() == parametroService.valueOf('tjmt:idOrgaoJulgador:VicePresidencia')}"/>
+        </transition>
+        <transition to="Triagem" name="06 - Triagem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-start">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <node name="Devolver ao órgão de origem">
+        <description><![CDATA[Atualizado: 25/07/2016
+Ojetivo: Deslocar o processo para o órgão julgador de origem]]></description>
+        <transition to="Triagem" name="Triagem"/>
+        <event type="node-enter">
+            <action expression="#{processoJudicialService.deslocarOrgaoJulgador(processoTrfHome.instance, tramitacaoProcessualService.recuperaVariavel('pje:fluxo:identificador:orgaoOrigem'), tramitacaoProcessualService.recuperaVariavel('pje:fluxo:identificador:colegiadoOrigem'), tramitacaoProcessualService.recuperaVariavel('pje:fluxo:identificador:cargoOrigem'))}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:identificador:orgaoOrigem')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel(&quot;pje:fluxo:identificador:colegiadoOrigem&quot;)}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:identificador:cargoOrigem')}"/>
+        </event>
+    </node>
+    <node name="Lançar movimento 132 - Rcebimento">
+        <transition to="Triagem" name="Triagem"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(132).lancarMovimento()}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Remetido ao STJ">
+        <task name="Remetido ao STJ" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentaLote" mapped-name="movimentarLote:MovimentaLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Lançar movimento 132 - Rcebimento" name="01 - Receber e encaminhar para triagem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <task-node end-tasks="true" name="Remetido ao STF">
+        <task name="Remetido ao STF" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarEmLote" mapped-name="movimentarLote:MovimentarEmLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Lançar movimento 132 - Rcebimento" name="01 - Receber e encaminhar para triagem"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('tjmt:movimento:remessa:preencherComTexto')}" name="Definir tarefa destino">
+        <transition to="Remetido ao STJ" name="STJ"/>
+        <transition to="Remetido ao STF" name="STF"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('tjmt:movimento:remessa:preencherComElementoDeCodigo')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('tjmt:movimento:remessa:preencherComTexto')}"/>
+        </event>
+    </decision>
+    <node name="Lançar movimento 123 - Remessa">
+        <transition to="Definir tarefa destino" name="Definir tarefa destino"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(tramitacaoProcessualService.recuperaVariavel('tjmt:movimento:remessa:preencherComElementoDeCodigo')).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(tramitacaoProcessualService.recuperaVariavel('tjmt:movimento:remessa:preencherComTexto')).lancarMovimento()}"/>
+        </event>
+    </node>
+    <task-node end-tasks="true" name="Remeter ao STF">
+        <task name="Remeter ao STF" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="01 - Cancelar e enviar para a triagem"/>
+        <transition to="Lançar movimento 123 - Remessa" name="02 - Confirmar envio e lançar movimento"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:movimento:remessa:preencherComElementoDeCodigo', 38)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:movimento:remessa:preencherComTexto', 'STF')}"/>
+        </event>
+        <event type="task-start">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Remeter ao STJ">
+        <task name="Remeter ao STJ" swimlane="Secretaria">
+            <controller>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="01 - Cancelar e enviar para a triagem"/>
+        <transition to="Lançar movimento 123 - Remessa" name="02 - Confirmar envio e lançar movimento"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:movimento:remessa:preencherComElementoDeCodigo', 38)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:movimento:remessa:preencherComTexto', 'STJ')}"/>
+        </event>
+        <event type="task-start">
+            <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Verificar custa">
+        <task name="Verificar custa" swimlane="Secretaria">
+            <controller>
+                <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
+                <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
+                <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Triagem" name="01 - Triagem"/>
+        <transition to="Cumprir decisão [BC2G]" name="02 - Cumprir decisão"/>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:flx:paginaExterna', parametroService.valueOf('tjmt:consulta:guia').concat(tramitacaoProcessualService.recuperaProcesso()))}"/>
+        </event>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaProcesso().inicial}" name="Arquivar ou Baixar comarca?">
+        <transition to="Devolver para instância de origem" name="R"/>
+        <transition to="Arquivo definitivo (Processo originário)" name="I"/>
+    </decision>
+    <node name="Registrar variavel de comunicação quando vindo do gabinete">
+        <transition to="Preparar comunicação " name="Preparar comunicação "/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:vindo:gabinete','true')}"/>
+        </event>
+    </node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:tjmt:vindo:gabinete') ? 'Cumprir decisão [BC2G]' : 'Suspender ou Sobrestar o processo'}" name="Verificar saída após comunicação">
+        <transition to="Cumprir decisão [BC2G]" name="Cumprir decisão [BC2G]"/>
+        <transition to="Suspender ou Sobrestar o processo" name="Suspender ou Sobrestar o processo"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:vindo:gabinete','false')}"/>
+        </event>
+    </decision>
+    <decision expression="#{tramitacaoProcessualService.recuperaProcesso().getJurisdicao().getIdJurisdicao() == parametroService.valueOf('pje:tjmt:codigo:recesso:forense') ? 'Registrar variável segundo grau [BC2G]' : 'Encaminhar para análise de prevenção'}" name="Distribuido no recesso forense?">
+        <transition to="Encaminhar para análise de prevenção" name="Encaminhar para análise de prevenção"/>
+        <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
+    </decision>
+    <process-state name="[FP2] - Analisar prevenção">
+        <sub-process name="Analisar prevenção" binding="late"/>
+        <transition to="Triagem" name="Triagem"/>
+    </process-state>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
