@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Desviar Processo de Fluxo"> 
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Desviar Processo de Fluxo">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Desvio de Processo">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Nó de Desvio - Desvio de Processo"/>
+        <transition to="Escolher fluxo para devio" name="Escolher fluxo para devio"/>
+    </start-state>  
+    <!-- NODES -->
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Desvio de Processo">
+        <task name="Nó de Desvio - Desvio de Processo" swimlane="Nó de Desvio - Desvio de Processo"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Desviar Processo de Fluxo" name="Nó de Desvio - Desviar Processo de Fluxo">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:pje:fluxo:desvio:processo', true)}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Escolher fluxo para devio">
+        <task name="Escolher fluxo para devio" swimlane="Nó de Desvio - Desvio de Processo"/>
+        <transition to="Nó de Desvio - Desvio de Processo" name="Nó de Desvio - Desvio de Processo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="[DP] - Apreciação colegiada por não relatores" name="03 - Apreciação colegiada por não relatores"/>
+        <transition to="[DP] - (TR) Preparar Sessão de Julgamento" name="01 - (TR) Preparar Sessão de Julgamento"/>
+        <transition to="[DP] - Analisar prevenção" name="02 - Analisar prevenção"/>
+        <transition to="[DP] - Avaliar Documento" name="04 - Avaliar Documento"/>
+        <transition to="[DP] - Avaliação de bens" name="05 - Avaliação de bens"/>
+        <transition to="[DP] - BaixaProcesso1Grau" name="06 - BaixaProcesso1Grau"/>
+        <transition to="[DP] - Controle de prazos" name="07 - Controle de prazos"/>
+        <transition to="[DP] - Cumprimento de decisão" name="08 - Cumprimento de decisão"/>
+        <transition to="[DP] - Cumprir decisão em 2º Grau" name="09 - Cumprir decisão em 2º Grau"/>
+        <transition to="[DP] - Decisão recurso externo" name="10 - Decisão recurso externo"/>
+        <transition to="[DP] - Deslocar Órgão Julgador Processo" name="11 - Deslocar Órgão Julgador Processo"/>
+        <transition to="[DP] - Efetivação Remessa para outro Gabinete" name="12 - Efetivação Remessa para outro Gabinete"/>
+        <transition to="[DP] - Fluxo Ações Originárias - HC e MS" name="13 - Fluxo Ações Originárias - HC e MS"/>
+        <transition to="[DP] - Fluxo de Recursos aos Tribunais Superiores" name="14 - Fluxo de Recursos aos Tribunais Superiores"/>
+        <transition to="[DP] - Fluxo de Voto Derrubado" name="15 - Fluxo de Voto Derrubado"/>
+        <transition to="[DP] - Fluxo de bloqueio de ativos do devedor" name="16 - Fluxo de bloqueio de ativos do devedor"/>
+        <transition to="[DP] - Fluxo de decisão colegiada em gabinete" name="17 - Fluxo de decisão colegiada em gabinete"/>
+        <transition to="[DP] - Fluxo para o envio de processo ao Supremo Tribunal Federal" name="18 - Fluxo para o envio de processo ao Supremo Tribunal Federal"/>
+        <transition to="[DP] - Fluxo principal segundo grau" name="19 - Fluxo principal segundo grau"/>
+        <transition to="[DP] - FluxoDistribuição2Grau" name="20 - FluxoDistribuição2Grau"/>
+        <transition to="[DP] - Intimação de parte seguida da do MP" name="21 - Intimação de parte seguida da do MP"/>
+        <transition to="[DP] - Liberação de ativos do devedor" name="22 - Liberação de ativos do devedor"/>
+        <transition to="[DP] - Preparar ato de cartório" name="23 - Preparar ato de cartório"/>
+        <transition to="[DP] - Preparar ato de comunicação" name="24 - Preparar ato de comunicação"/>
+        <transition to="[DP] - Preparar ato judicial" name="25 - Preparar ato judicial"/>
+        <transition to="[DP] - Preparar ato judicial de 2º Grau" name="26 - Preparar ato judicial de 2º Grau"/>
+        <transition to="[DP] - Remessa para Tribunal Superior - STJ" name="27 - Remessa para Tribunal Superior - STJ"/>
+        <transition to="[DP] - Vinculação Regimental" name="28 - Vinculação Regimental"/>
+        <transition to="[DP] - Vinculação de Revisor" name="29 - Vinculação de Revisor"/>
+        <transition to="Nó de Desvio - Desviar Processo de Fluxo" name="Nó de Desvio - Desviar Processo de Fluxo">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="[DP] - Recursos Internos" name="30 - Recursos Internos"/>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('tjmt:pje:fluxo:desvio:processo', true)}"/>
+        </event>
+    </task-node>
+    <process-state name="[DP] - Fluxo Ações Originárias - HC e MS">
+        <sub-process name="Fluxo Ações Originárias - HC e MS" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Controle de prazos">
+        <sub-process name="Controle de prazos" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Apreciação colegiada por não relatores">
+        <sub-process name="Apreciação colegiada por não relatores" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - (TR) Preparar Sessão de Julgamento">
+        <sub-process name="(TR) Preparar Sessão de Julgamento" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Analisar prevenção">
+        <sub-process name="Analisar prevenção" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Avaliar Documento">
+        <sub-process name="Avaliar Documento" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Avaliação de bens">
+        <sub-process name="Avaliação de bens" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - BaixaProcesso1Grau">
+        <sub-process name="Baixa de processo oriundo do 1 grau" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Cumprimento de decisão">
+        <sub-process name="Cumprimento de decisão" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Cumprir decisão em 2º Grau">
+        <sub-process name="Cumprir decisão em 2º Grau" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Decisão recurso externo">
+        <sub-process name="Decisão recurso externo" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Deslocar Órgão Julgador Processo">
+        <sub-process name="Deslocar Órgão Julgador Processo" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Efetivação Remessa para outro Gabinete">
+        <sub-process name="Efetivação Remessa para outro Gabinete" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo de Recursos aos Tribunais Superiores">
+        <sub-process name="Fluxo de Recursos aos Tribunais Superiores" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo de Voto Derrubado">
+        <sub-process name="Fluxo de Voto Derrubado" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo de bloqueio de ativos do devedor">
+        <sub-process name="Fluxo de bloqueio de ativos do devedor" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo de decisão colegiada em gabinete">
+        <sub-process name="Fluxo de decisão colegiada em gabinete" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo para o envio de processo ao Supremo Tribunal Federal">
+        <sub-process name="Fluxo de Recursos aos Tribunais Superiores" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Fluxo principal segundo grau">
+        <sub-process name="Fluxo principal segundo grau" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - FluxoDistribuição2Grau">
+        <sub-process name="FluxoDistribuição2Grau" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Intimação de parte seguida da do MP">
+        <sub-process name="Intimação de parte seguida da do MP" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Liberação de ativos do devedor">
+        <sub-process name="Liberação de ativos do devedor" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Preparar ato de cartório">
+        <sub-process name="Preparar ato de cartório" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Preparar ato de comunicação">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Preparar ato judicial">
+        <sub-process name="Preparar ato judicial" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Preparar ato judicial de 2º Grau">
+        <sub-process name="Preparar ato judicial de 2º Grau" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Recursos Internos">
+        <sub-process name="Recursos Internos" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Remessa para Tribunal Superior - STJ">
+        <sub-process name="Remessa para Tribunal Superior - STJ" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Vinculação Regimental">
+        <sub-process name="Vinculação Regimental" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <process-state name="[DP] - Vinculação de Revisor">
+        <sub-process name="Vinculação de Revisor" binding="late"/>
+        <transition to="Término" name="Término"/>
+    </process-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Desviar Processo de Fluxo">
+        <task name="Nó de Desvio - Desviar Processo de Fluxo" swimlane="Nó de Desvio - Desviar Processo de Fluxo"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Desvio de Processo" name="Nó de Desvio - Desvio de Processo"/>
+        <transition to="Escolher fluxo para devio" name="Escolher fluxo para devio"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
