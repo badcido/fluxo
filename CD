@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Cumprimento de decisão">
+    <description><![CDATA[Fluxo destinado a permitir o cumprimento de decisões de magistrados, inclusive eventuais determinações de redistribuições.]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Nó de Desvio - Cumprimento de decisão">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>
+    <swimlane name="Secretaria - Análise de Conhecimento">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('4:5483,197:1338')}"/>
+    </swimlane>
+    <swimlane name="Secretaria - Processamento de Feitos">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('205:5483,197:1338')}"/>
+    </swimlane>
+    <swimlane name="Secretaria - Apoio a Sessão Plenária">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('206:5483,197:1338')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="Secretaria - Análise de Conhecimento"/>
+        <transition to="Avaliar determinações do magistrado" name="Avaliar determinações do magistrado"/>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('cumpridec:haoutrasprovidencias')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('cumpridec:haintimacoes')}"/>
+        </event>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Avaliar determinações do magistrado">
+        <task name="Avaliar determinações do magistrado" swimlane="Secretaria - Análise de Conhecimento">
+            <controller>
+                <variable name="cumpridec_haintimacoes" mapped-name="sim_nao:cumpridec_haintimacoes" access="read,write"/>
+                <variable name="cumpridec_haoutrasprovidencias" mapped-name="sim_nao:cumpridec_haoutrasprovidencias" access="read,write"/>
+                <variable name="Processo_Fluxo_visualizarDecisao" mapped-name="frame:Processo_Fluxo_visualizarDecisao" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[]]></description>
+        <transition to="Testa existência de providências" name="Prosseguir"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-end">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('cumpridec:haintimacoes', tramitacaoProcessualService.recuperaVariavelTarefa('sim_nao:cumpridec_haintimacoes'))}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('cumpridec:haoutrasprovidencias',tramitacaoProcessualService.recuperaVariavelTarefa('sim_nao:cumpridec_haoutrasprovidencias'))}"/>
+        </event>
+    </task-node>
+    <decision expression="#{(tramitacaoProcessualService.recuperaVariavel('cumpridec:haintimacoes') or tramitacaoProcessualService.recuperaVariavel('cumpridec:haoutrasprovidencias')) ? 'Separação em cumprimento de ato judicial' : 'Término'}" name="Testa existência de providências">
+        <transition to="Separação em cumprimento de ato judicial" name="Separação em cumprimento de ato judicial"/>
+        <transition to="Término" name="Término"/>
+    </decision>
+    <task-node end-tasks="true" name="Retificar dados do processo">
+        <task name="Retificar dados do processo" swimlane="Secretaria - Processamento de Feitos">
+            <controller>
+                <variable name="Processo_RetificacaoAutuacao_updateRetificacaoAutuacao" mapped-name="page:Processo_RetificacaoAutuacao_updateRetificacaoAutuacao" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Junção em cumprimento de ato judicial" name="Nada mais a cumprir"/>
+        <transition to="Cumprir determinações" name="Cumprir determinações"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <process-state name="Intimar de decisão">
+        <sub-process name="Intimação de parte seguida da do MP" binding="late"/>
+        <transition to="Junção em cumprimento de ato judicial" name="Junção em cumprimento de ato judicial"/>
+    </process-state>
+    <task-node end-tasks="true" name="Cumprir determinações">
+        <task name="Cumprir determinações" swimlane="Secretaria - Análise de Conhecimento">
+            <controller>
+                <variable name="Processo_Fluxo_visualizarDecisao" mapped-name="frame:Processo_Fluxo_visualizarDecisao" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Retificar dados do processo" name="Retificar dados do processo"/>
+        <transition to="Apensar processos" name="Apensar processos"/>
+        <transition to="Junção em cumprimento de ato judicial" name="Nada mais a cumprir"/>
+        <transition to="Encaminhar para redistribuição" name="Encaminhar para redistribuição"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Aguardar Julgamento" name="Aguardar Julgamento"/>
+        <transition to="Intimar da Pauta" name="Intimar da Pauta"/>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardar Julgamento">
+        <task name="Aguardar Julgamento" swimlane="Secretaria - Apoio a Sessão Plenária"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Junção em cumprimento de ato judicial" name="Prosseguir"/>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:aguardaJulgamentoColegiado','true')}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Junção em cumprimento de ato judicial')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:aguardaJulgamentoColegiado')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Incluir em pauta">
+        <task name="Incluir em pauta" swimlane="Secretaria - Apoio a Sessão Plenária"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Cumprir determinações" name="Cumprir determinações"/>
+    </task-node>
+    <process-state name="Intimar da Pauta">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Incluir em pauta" name="Incluir em pauta"/>
+    </process-state>
+    <process-state name="Encaminhar para redistribuição">
+        <sub-process name="FluxoDistribuição2Grau" binding="late"/>
+        <transition to="Junção em cumprimento de ato judicial" name="Junção em cumprimento de ato judicial"/>
+    </process-state>
+    <task-node end-tasks="true" name="Apensar processos">
+        <task name="Apensar processos" swimlane="Secretaria - Processamento de Feitos">
+            <controller>
+                <variable name="Processo_Fluxo_associarProcessos" mapped-name="frame:Processo_Fluxo_associarProcessos" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Junção em cumprimento de ato judicial" name="Nada mais a cumprir"/>
+        <transition to="Cumprir determinações" name="Cumprir determinações"/>
+        <transition to="Nó de Desvio - Cumprimento de decisão" name="Nó de Desvio - Cumprimento de decisão">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <fork name="Separação em cumprimento de ato judicial">
+        <transition to="Há intimações pendentes de criação?" name="Há intimações pendentes de criação?"/>
+        <transition to="Há outras providências determinadas?" name="Há outras providências determinadas?"/>
+    </fork>
+    <decision expression="#{org.jboss.seam.bpm.processInstance.contextInstance.getVariable('cumpridec:haintimacoes') ? 'Intimar de decisão' : 'Junção em cumprimento de ato judicial'}" name="Há intimações pendentes de criação?">
+        <transition to="Junção em cumprimento de ato judicial" name="Junção em cumprimento de ato judicial"/>
+        <transition to="Intimar de decisão" name="Intimar de decisão"/>
+    </decision>
+    <join name="Junção em cumprimento de ato judicial">
+        <transition to="Término" name="Prosseguir"/>
+    </join>
+    <decision expression="#{org.jboss.seam.bpm.processInstance.contextInstance.getVariable('cumpridec:haoutrasprovidencias') ? 'Cumprir determinações' : 'Junção em cumprimento de ato judicial'}" name="Há outras providências determinadas?">
+        <transition to="Junção em cumprimento de ato judicial" name="Junção em cumprimento de ato judicial"/>
+        <transition to="Cumprir determinações" name="Cumprir determinações"/>
+    </decision>
+    <end-state name="Término">
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('cumpridec:haoutrasprovidencias')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('cumpridec:haintimacoes')}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Cumprimento de decisão">
+        <task name="Nó de Desvio - Cumprimento de decisão" swimlane="Nó de Desvio - Cumprimento de decisão"/>
+        <transition to="Avaliar determinações do magistrado" name="Avaliar determinações do magistrado"/>
+        <transition to="Retificar dados do processo" name="Retificar dados do processo"/>
+        <transition to="Cumprir determinações" name="Cumprir determinações"/>
+        <transition to="Apensar processos" name="Apensar processos"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Aguardar Julgamento" name="Aguardar Julgamento"/>
+        <transition to="Incluir em pauta" name="Incluir em pauta"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
