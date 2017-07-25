@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Remessa para Tribunal Superior - STJ">
+    <description><![CDATA[Fluxo para o envio de processo ao Superior Tribunal de Justiça.]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Divisão de Recursos">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:5904,8:5903,8:5902,8:5900')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:5904,8:1')}"/>
+    </swimlane>
+    <swimlane name="Digitalização">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('8:5905')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="Aguardando Envio Externo - STJ" name="Aguardando Envio Externo - STJ"/>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Aguardando Envio Externo - STJ">
+        <task name="Aguardando Envio Externo - STJ" swimlane="Digitalização"/>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Solicitar Correções para Remessa - STJ" name="Solicitar Correções para Remessa - STJ"/>
+        <transition to="Informar Envio Externo - STJ" name="Informar Envio Externo - STJ"/>
+    </task-node>
+    <task-node end-tasks="true" name="Solicitar Correções para Remessa - STJ">
+        <task name="Solicitar Correções para Remessa - STJ" swimlane="Digitalização">
+            <controller>
+                <variable name="txtSolicitacaoCorrecoes" mapped-name="text:txtSolicitacaoCorrecoes" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Aguardando Correções para Remessa - STJ" name="Confirmar Solicitação de Correções"/>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardando Correções para Remessa - STJ">
+        <task name="Aguardando Correções para Remessa - STJ" swimlane="Divisão de Recursos">
+            <controller>
+                <variable name="vlrTxtSolicitacaoCorrecoes" mapped-name="textAlert:vlrTxtSolicitacaoCorrecoes" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Realizar Correções - STJ" name="Realizar Correções"/>
+        <transition to="Aguardando Envio Externo - STJ" name="Finalizar Correções"/>
+    </task-node>
+    <process-state name="Realizar Correções - STJ">
+        <sub-process name="Cumprimento de decisão segundo grau" binding="late"/>
+        <transition to="Aguardando Correções para Remessa - STJ" name="Aguardando Correções para Remessa - STJ"/>
+    </process-state>
+    <task-node end-tasks="true" name="Informar Envio Externo - STJ">
+        <task name="Informar Envio Externo - STJ" swimlane="Digitalização">
+            <controller>
+                <variable name="arqEnvioExterno" mapped-name="textEditSignature:arqEnvioExterno" access="read,write,required"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Informar Recebimento por Tribunal Superior - STJ" name="Confirmar Envio Externo">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('tiposDisponiveisIds', '57')}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Confirmar Envio Externo')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo('38').comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(&quot;SUPERIOR TRIBUNAL DE JUSTIÇA&quot;).lancarMovimento()}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Informar Recebimento por Tribunal Superior - STJ">
+        <task name="Informar Recebimento por Tribunal Superior - STJ" swimlane="Digitalização">
+            <controller>
+                <variable name="arqRecebimento" mapped-name="textEditSignature:arqRecebimento" access="read,write,required"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Informar Devolução de Tribunal Superior - STJ" name="Confirmar Recebimento">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('tiposDisponiveisIds', '57')}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Confirmar Recebimento')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Informar Devolução de Tribunal Superior - STJ">
+        <task name="Informar Devolução de Tribunal Superior - STJ" swimlane="Digitalização">
+            <controller>
+                <variable name="arqDevolucao" mapped-name="textEditSignature:arqDevolucao" access="read,write,required"/>
+            </controller>
+        </task>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Aguardando Baixa - STJ" name="Confirmar Devolução">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('tiposDisponiveisIds', '57')}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Confirmar Devolução')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Aguardando Baixa - STJ">
+        <task name="Aguardando Baixa - STJ" swimlane="Divisão de Recursos"/>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Realizar Baixa - STJ" name="Realizar Baixa - STJ"/>
+        <transition to="Análise de Cartório" name="Análise de Cartório"/>
+    </task-node>
+    <task-node end-tasks="true" name="Realizar Baixa - STJ">
+        <task name="Realizar Baixa - STJ" swimlane="Divisão de Recursos">
+            <controller>
+                <variable name="arqBaixa" mapped-name="textEditSignature:arqBaixa" access="read,write,required"/>
+            </controller>
+        </task>
+        <transition to="Término" name="Confirmar Baixa">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Nó de Desvio - Remessa para Tribunal Superior - STJ" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-create">
+            <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('tiposDisponiveisIds', '57')}"/>
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Confirmar Baixa')}"/>
+        </event>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(132).lancarMovimento()}"/>
+        </event>
+    </task-node>
+    <process-state name="Análise de Cartório">
+        <sub-process name="Cumprimento de decisão segundo grau" binding="late"/>
+        <transition to="Aguardando Baixa - STJ" name="Aguardando Baixa - STJ"/>
+    </process-state>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Remessa para Tribunal Superior - STJ">
+        <task name="Nó de Desvio - Remessa para Tribunal Superior - STJ" swimlane="Nó de Desvio - Remessa para Tribunal Superior - STJ"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Aguardando Envio Externo - STJ" name="Aguardando Envio Externo - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Informar Envio Externo - STJ" name="Informar Envio Externo - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Solicitar Correções para Remessa - STJ" name="Solicitar Correções para Remessa - STJ"/>
+        <transition to="Aguardando Correções para Remessa - STJ" name="Aguardando Correções para Remessa - STJ">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Informar Recebimento por Tribunal Superior - STJ" name="Informar Recebimento por Tribunal Superior - STJ"/>
+        <transition to="Informar Devolução de Tribunal Superior - STJ" name="Informar Devolução de Tribunal Superior - STJ"/>
+        <transition to="Realizar Baixa - STJ" name="Realizar Baixa - STJ"/>
+        <transition to="Aguardando Baixa - STJ" name="Aguardando Baixa - STJ"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
