@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Preparar ato de cartório">
+    <description><![CDATA[Neste fluxo não funciona Minuta/Assinatura em lote para o chefe de secretaria e o magistrado assinarem em lote.]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Chefe de Secretaria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338')}"/>
+    </swimlane>
+    <swimlane name="Magistrado">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('7:1469')}"/>
+    </swimlane>
+    <swimlane name="Secretaria">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:5211,197:1338')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Cumprir decisão em 2º Grau">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial"/>
+        <transition to="Preparar ato de cartório" name="Preparar ato de cartório"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('minutaEmElaboracao')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('atoordinatorio')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('MovimentosLancadosTemporariamente')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('AgrupamentosLancadosTemporariamente')}"/>
+        </event>
+    </start-state>  
+    <!-- NODES -->
+    <task-node end-tasks="true" name="Preparar ato de cartório">
+        <task name="Preparar ato de cartório" swimlane="Secretaria">
+            <controller>
+                <variable name="atoordinatorio" mapped-name="textEditGabineteJT:atoordinatorio" access="read,write"/>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame que permita a criação de mais de um documento para posterior assinatura quer de outro papel no cartório, quer do magistrado.]]></description>
+        <transition to="Assinar ato em cartório" name="Enviar ao chefe de secretaria"/>
+        <transition to="Assinar ato de cartório" name="Enviar ao magistrado"/>
+        <transition to="Nó de Desvio - Preparar ato de cartório" name="Nó de Desvio - Preparar ato de cartório">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action name="upd" expression="#{tipoDocumento.set('atoordinatorio',103,69,70,71,93,34,109)}"/>
+            <action name="upd" expression="#{modeloDocumento.set('atoordinatorio',239,240,219,217,222,221,225,228,228,226,229,235,236,230,238,237,224,227)}"/>
+        </event>
+        <event type="task-end">
+            <action expression="#{not empty processoHome.idProcessoDocumento and processoHome.idProcessoDocumento &gt; 0 ? tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', processoHome.idProcessoDocumento) : tramitacaoProcessualService.gravaVariavel('minutaEmElaboracao', tramitacaoProcessualService.recuperaVariavelTarefa('textEditGabineteJT:atoordinatorio'))}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Assinar ato em cartório">
+        <task name="Assinar ato em cartório" swimlane="Chefe de Secretaria">
+            <controller>
+                <variable name="Processo_Fluxo_revisarMinuta" mapped-name="frame:Processo_Fluxo_revisarMinuta" access="read,write"/>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame que permita a assinatura de um ou mais documentos existentes previamente preparados e cujos identificadores estejam armazenados na variável pje:fluxo:documento:minutas.
+Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na situação em que houver mais de um documento para o mesmo processo e na situação em que houver documentos de processos diversos, este frame deverá ser capaz de tolerar a assinatura em lote.]]></description>
+        <transition to="Término" name="Finalizar ato de cartório"/>
+        <transition to="Preparar ato de cartório" name="Retornar minuta de cartório"/>
+        <transition to="Assinar ato de cartório" name="Encaminhar ao magistrado"/>
+        <transition to="Nó de Desvio - Preparar ato de cartório" name="Nó de Desvio - Preparar ato de cartório">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action name="upd" expression="#{tipoDocumento.set('Processo_Fluxo_revisarMinuta',103,69,70,71,93,34,109)}"/>
+            <action name="upd" expression="#{modeloDocumento.set('Processo_Fluxo_revisarMinuta',239,240,219,217,222,221,225,228,228,226,229,235,236,230,238,237,224,227)}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Assinar ato de cartório">
+        <task name="Assinar ato de cartório" swimlane="Magistrado">
+            <controller>
+                <variable name="Processo_Fluxo_revisarMinuta" mapped-name="frame:Processo_Fluxo_revisarMinuta" access="read,write"/>
+                <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+            </controller>
+        </task>
+        <description><![CDATA[Incluir frame que permita a assinatura de um ou mais documentos existentes previamente preparados e cujos identificadores estejam armazenados na variável pje:fluxo:documento:minutas.
+Este frame deve estar preparado para realizar assinaturas em lote, ou seja, na situação em que houver mais de um documento para o mesmo processo e na situação em que houver documentos de processos diversos, este frame deverá ser capaz de tolerar a assinatura em lote.]]></description>
+        <transition to="Término" name="Finalizar ato de cartório"/>
+        <transition to="Preparar ato de cartório" name="Retornar minuta de cartório"/>
+        <transition to="Nó de Desvio - Preparar ato de cartório" name="Nó de Desvio - Preparar ato de cartório">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action name="upd" expression="#{tipoDocumento.set('Processo_Fluxo_revisarMinuta',103,69,70,71,93,34,109)}"/>
+            <action name="upd" expression="#{modeloDocumento.set('Processo_Fluxo_revisarMinuta',239,240,219,217,222,221,225,228,228,226,229,235,236,230,238,237,224,227)}"/>
+        </event>
+    </task-node>
+    <end-state name="Término">
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('atoordinatorio')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('minutaEmElaboracao')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('MovimentosLancadosTemporariamente')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('AgrupamentosLancadosTemporariamente')}"/>
+        </event>
+    </end-state>
+    <task-node end-tasks="true" name="Nó de Desvio - Preparar ato de cartório">
+        <task name="Nó de Desvio - Preparar ato de cartório" swimlane="Nó de Desvio - Cumprir decisão em 2º Grau"/>
+        <transition to="Preparar ato de cartório" name="Preparar ato de cartório"/>
+        <transition to="Assinar ato em cartório" name="Assinar ato em cartório"/>
+        <transition to="Assinar ato de cartório" name="Assinar ato de cartório"/>
+        <transition to="Término" name="Término"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>  
+    <!-- ACTIONS --> 
+</process-definition>
