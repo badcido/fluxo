@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<process-definition xmlns="urn:jbpm.org:jpdl-3.2" name="Recursos Internos">
+    <description><![CDATA[]]></description>  
+    <!-- SWIMLANES -->
+    <swimlane name="Desembargador">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('6:5197,7:1469')}"/>
+    </swimlane>
+    <swimlane name="solicitante"/>
+    <swimlane name="Secretaria Judiciária - Divisão Judiciária">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,198:5483')}"/>
+    </swimlane>
+    <swimlane name="Nó de Desvio - Recursos Internos">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,7:1469')}"/>
+    </swimlane>
+    <swimlane name="Secretaria Judiciária - Análise de Conhecimento">
+        <assignment pooled-actors="#{localizacaoAssignment.getPooledActors('197:1338,4:5483')}"/>
+    </swimlane>  
+    <!-- START-STATE -->
+    <start-state name="Início">
+        <task name="Tarefa inicial" swimlane="solicitante"/>
+        <transition to="Verificar Evento" name="Verificar Evento"/>
+    </start-state>  
+    <!-- NODES -->
+    <decision expression="#{processoTrfHome.verificaUltimoEventoDistribuicaoRedistribuicao() ? 'Preparar ato do magistrado' : 'Verificar Conclusão'}" name="Verificar Evento">
+        <description><![CDATA[]]></description>
+        <transition to="Verificar Conclusão" name="Verificar Conclusão">
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.setVariable('tj:processoNovo', false)}"/>
+        </transition>
+        <transition to="Preparar ato do magistrado" name="Preparar ato do magistrado">
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.setVariable('tj:processoNovo', true)}"/>
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(6).lancarMovimento()}"/>
+        </transition>
+    </decision>
+    <decision expression="#{processoTrfHome.possuiEventoTestandoExcludente('Conclusão', 'Magistrado') ? 'Preparar ato do magistrado' : 'Análise da Secretaria'}" name="Verificar Conclusão">
+        <transition to="Análise da Secretaria" name="Análise da Secretaria"/>
+        <transition to="Preparar ato do magistrado" name="Preparar ato do magistrado"/>
+    </decision>
+    <decision expression="#{processoHome.verificaUltimoEvento(processoHome.instance,eventoProcessualManager.findByIds('193','193').get(0)) ? 'Intimar de decisão terminativa' : 'Cumprir determinações do magistrado'}" name="Testa decisão proferida">
+        <transition to="Intimar de decisão terminativa" name="Intimar de decisão terminativa"/>
+        <transition to="Cumprir determinações do magistrado" name="Cumprir determinações do magistrado"/>
+    </decision>
+    <process-state name="Intimar de decisão terminativa">
+        <sub-process name="Preparar ato de comunicação" binding="late"/>
+        <transition to="Aguardar recurso de decisão terminativa" name="Aguardar recurso de decisão terminativa"/>
+    </process-state>
+    <process-state name="Aguardar recurso de decisão terminativa">
+        <sub-process name="Controle de prazos" binding="late"/>
+        <transition to="Avaliar interposição de recurso" name="Avaliar interposição de recurso"/>
+    </process-state>
+    <task-node end-tasks="true" name="Avaliar interposição de recurso">
+        <task name="Avaliar interposição de recurso" swimlane="Secretaria Judiciária - Divisão Judiciária">
+            <controller>
+                <variable name="tj_recursoInterno" mapped-name="sim_nao:tj_recursoInterno" access="read,write,required"/>
+                <variable name="tj_recursoExterno" mapped-name="sim_nao:tj_recursoExterno" access="read,write,required"/>
+            </controller>
+        </task>
+        <description><![CDATA[]]></description>
+        <transition to="Testa existência de recurso interno" name="Prosseguir"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="task-end">
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tj:recursoInterno', tramitacaoProcessualService.recuperaVariavelTarefa('sim_nao:tj_recursoInterno'))}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('tj:recursoExterno', tramitacaoProcessualService.recuperaVariavelTarefa('sim_nao:tj_recursoExterno'))}"/>
+        </event>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('tj:recursoInterno') ? 'Aguardar Decisão de Recurso Interno' : 'Testa existência de recurso externo'}" name="Testa existência de recurso interno">
+        <description><![CDATA[]]></description>
+        <transition to="Aguardar Decisão de Recurso Interno" name="Aguardar Decisão de Recurso Interno"/>
+        <transition to="Testa existência de recurso externo" name="Testa existência de recurso externo"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('tjpb:recursoInterno')}"/>
+        </event>
+    </decision>
+    <task-node end-tasks="true" name="Aguardar Decisão de Recurso Interno">
+        <task name="Aguardar Decisão de Recurso Interno" swimlane="Secretaria Judiciária - Divisão Judiciária"/>
+        <transition to="Intimar de decisão terminativa" name="Intimar de decisão terminativa"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('tj:recursoExterno') ? 'Aguardar Decisão de Recurso Externo' : 'Avaliar decisão final RI'}" name="Testa existência de recurso externo">
+        <transition to="Aguardar Decisão de Recurso Externo" name="Aguardar Decisão de Recurso Externo"/>
+        <transition to="Avaliar decisão final RI" name="Avaliar decisão final RI"/>
+    </decision>
+    <task-node end-tasks="true" name="Aguardar Decisão de Recurso Externo">
+        <task name="Aguardar Decisão de Recurso Externo" swimlane="Secretaria Judiciária - Divisão Judiciária"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Avaliar decisão final RI" name="Avaliar decisão final RI"/>
+    </task-node>
+    <task-node end-tasks="true" name="Avaliar decisão final RI">
+        <task name="Avaliar decisão final RI" swimlane="Secretaria Judiciária - Análise de Conhecimento"/>
+        <transition to="Certificar trânsito em julgado RI" name="Certificar trânsito em julgado RI"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Preparar ato do magistrado" name="Preparar ato do magistrado"/>
+    </task-node>
+    <task-node end-tasks="true" name="Certificar trânsito em julgado RI">
+        <task name="Certificar trânsito em julgado RI" swimlane="Secretaria Judiciária - Divisão Judiciária">
+            <controller>
+                <variable name="Certidao_transito" mapped-name="textEditSignature:Certidao_transito" access="read,write"/>
+            </controller>
+        </task>
+        <transition to="Arquivo Definitivo RI" name="Arquivo Definitivo RI">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('arquivo').lancarMovimento()}"/>
+        </transition>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{org.jboss.seam.bpm.processInstance.contextInstance.setVariable('tiposDisponiveisIds', '70')}"/>
+        </event>
+    </task-node>
+    <task-node end-tasks="true" name="Arquivo Definitivo RI">
+        <task name="Arquivo Definitivo RI" swimlane="Secretaria Judiciária - Análise de Conhecimento"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Análise da Secretaria" name="Desarquivar">
+            <action expression="#{preencherMovimento.deCodigo(978).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto('secretaria').lancarMovimento()}"/>
+        </transition>
+        <event type="node-enter">
+            <action expression="#{preencherMovimento.deCodigo(977).lancarMovimento()}"/>
+        </event>
+    </task-node>
+    <process-state name="Preparar ato do magistrado">
+        <sub-process name="Preparar ato judicial" binding="late"/>
+        <transition to="Testa decisão proferida" name="Testa decisão proferida"/>
+    </process-state>
+    <process-state name="Cumprir determinações do magistrado">
+        <sub-process name="Cumprimento de decisão" binding="late"/>
+        <transition to="Análise da Secretaria" name="Análise da Secretaria"/>
+    </process-state>
+    <task-node end-tasks="true" name="Análise da Secretaria">
+        <task name="Análise da Secretaria" swimlane="Secretaria Judiciária - Análise de Conhecimento">
+            <controller/>
+        </task>
+        <transition to="Preparar ato do magistrado" name="Conclusos para despacho">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(5).lancarMovimento()}"/>
+        </transition>
+        <transition to="Preparar ato do magistrado" name="Conclusos para decisão">
+            <action expression="#{preencherMovimento.deCodigo(51).comComplementoDeCodigo(3).doTipoDominio().preencherComElementoDeCodigo(6).lancarMovimento()}"/>
+        </transition>
+        <transition to="Cumprir determinações do magistrado" name="Avaliar Decisão Magistrado"/>
+        <transition to="Nó de Desvio - Recursos Internos" name="Nó de Desvio - Recursos Internos">
+            <condition expression="#{true}"/>
+        </transition>
+    </task-node>
+    <end-state name="Término"/>
+    <task-node end-tasks="true" name="Nó de Desvio - Recursos Internos">
+        <task name="Nó de Desvio - Recursos Internos" swimlane="Nó de Desvio - Recursos Internos"/>
+        <transition to="Avaliar interposição de recurso" name="Avaliar interposição de recurso"/>
+        <transition to="Aguardar Decisão de Recurso Interno" name="Aguardar Decisão de Recurso Interno"/>
+        <transition to="Aguardar Decisão de Recurso Externo" name="Aguardar Decisão de Recurso Externo"/>
+        <transition to="Análise da Secretaria" name="Análise da Secretaria"/>
+        <transition to="Término" name="Término"/>
+        <transition to="Avaliar decisão final RI" name="Avaliar decisão final RI"/>
+        <transition to="Certificar trânsito em julgado RI" name="Certificar trânsito em julgado RI"/>
+        <transition to="Arquivo Definitivo RI" name="Arquivo Definitivo RI"/>
+    </task-node>  
+    <!-- PROCESS-EVENTS -->
+    <event type="node-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="node-leave">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="before-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="superstate-enter">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="transition">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="process-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-end">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-start">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="subprocess-created">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="after-signal">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-assign">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="task-create">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event>
+    <event type="timer">
+        <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
+    </event> 
+</process-definition>
