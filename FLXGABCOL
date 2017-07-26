@@ -165,7 +165,6 @@ Este parametro é criado em três fluxos:
         <transition to="Ultimo movimento igual 269?" name="Ultimo movimento igual 269?"/>
         <event type="node-leave">
             <action name="upd" expression="{tramitacaoProcessualService.recuperaProcesso().setProntoRevisao(true)}"/>
-            <action name="upd" expression="#{processoJudicialManager.flush()}"/>
         </event>
     </process-state>
     <task-node end-tasks="true" name="Finalizar Encaminhamento">
@@ -199,9 +198,6 @@ Este parametro é criado em três fluxos:
         <transition to="Registrar aptidão para julgamento" name="Registrar aptidão para julgamento"/>
         <event type="node-enter">
             <action expression="#{tramitacaoProcessualService.recuperaProcesso().setRevisado(true)}"/>
-        </event>
-        <event type="node-leave">
-            <action name="upd" expression="#{processoJudicialManager.flush()}"/>
         </event>
     </node>
     <process-state name="Análise do Cartório - Revisão">
@@ -327,6 +323,7 @@ Este parametro é criado em três fluxos:
         <transition to="Finalizar Relatório com Revisão" name="04 - Finalizar Relatório com Revisão">
             <condition expression="#{tramitacaoProcessualService.recuperaProcesso().getExigeRevisor()}"/>
         </transition>
+        <transition to="Redistribuir processo - Relator substituto" name="05 - Redistribuir processo - Relator substituto"/>
         <event type="task-create">
             <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:colegiado:aguardaSessao', true)}"/>
             <action expression="#{tramitacaoProcessualService.gravaVariavelTarefa('pje:fluxo:colegiado:aguardaSessao:relator', true)}"/>
@@ -686,7 +683,13 @@ Como também este mesmo nó deve ser adicionado na transição de saída.]]></de
             <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoCargoDestino', tramitacaoProcessualService.recuperaProcesso().orgaoJulgadorCargo.idOrgaoJulgadorCargo)}"/>
             <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoDestino', tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorRevisor().getOrgaoJulgadorColegiadoOrgaoJulgadorList().get(0).getOrgaoJulgadorColegiado().getIdOrgaoJulgadorColegiado())}"/>
         </event>
-    </node>  
+    </node>
+    <process-state name="Redistribuir processo - Relator substituto">
+        <sub-process name="Fluxo de redistribuição" binding="late"/>
+        <description><![CDATA[Sub-processo que permite a redistribuição do processo.
+Na tarefa "aguardando sessão" pode existir a possibilidade de redistribuir o processo. Quando isso acontecer o processo passa por aqui e volta para "aguardando sessão".]]></description>
+        <transition to="Aguardando a sessão" name="Aguardando a sessão"/>
+    </process-state>  
     <!-- PROCESS-EVENTS -->
     <event type="node-enter">
         <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>

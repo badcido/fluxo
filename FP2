@@ -25,14 +25,24 @@
         <transition to="Distribuir processo?" name="Distribuir processo?"/>
     </start-state>  
     <!-- NODES -->
-    <decision expression="#{parametroService.valueOf('pje:tjmt:distribuir:processo') ? 'Evoluiu classe?' : 'Término'}" name="Distribuir processo?">
+    <decision expression="#{processoTrfHome.isAtendimentoEmPlantao() ? 'Setar dados do plantonista':'Evoluiu classe?'}" name="Plantão?">
+        <transition to="Setar dados do plantonista" name="Setar dados do plantonista"/>
         <transition to="Evoluiu classe?" name="Evoluiu classe?"/>
-        <transition to="Término" name="Término"/>
     </decision>
-    <decision expression="#{(processoTrfHome.getDataDistribuicao().substring(6,10)).concat(processoTrfHome.getDataDistribuicao().substring(3,5)).concat(processoTrfHome.getDataDistribuicao().substring(0,2)).equals((currentDate).toString().replace('-','')) ? 'Recupera Classe Judicial' : 'Verificar custa'}" name="Evoluiu classe?">
+    <decision expression="#{parametroService.valueOf('pje:tjmt:distribuir:processo') ? 'É da Turma Recursal?' : 'Término'}" name="Distribuir processo?">
+        <transition to="Término" name="Término"/>
+        <transition to="É da Turma Recursal?" name="É da Turma Recursal?"/>
+    </decision>
+    <decision expression="#{tramitacaoProcessualService.recuperaProcesso().competencia.getIdCompetencia() == 21 ? (parametroService.valueOf('tjmt:pje:fluxo:turmaRecursal:classe:tarefa:triagem').contains(&quot;[&quot;.concat(tramitacaoProcessualService.recuperaVariavel('pje:fp2:idClasseProcessual')).concat(&quot;]&quot;)) ? 'Verificar custas' : 'Registrar variável segundo grau [BC2G]') : 'Plantão?'}" name="É da Turma Recursal?">
+        <transition to="Plantão?" name="Plantão?"/>
+        <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
+        <transition to="Verificar custa" name="Verificar custa"/>
+    </decision>
+    <decision expression="#{((processoTrfHome.getDataDistribuicao().substring(6,10)).concat(processoTrfHome.getDataDistribuicao().substring(3,5)).concat(processoTrfHome.getDataDistribuicao().substring(0,2)).equals((currentDate).toString().replace('-','')) ? 'Recupera Classe Judicial' : (parametroService.valueOf('classeJudicialQNaoVerificaCustas').contains(processoTrfHome.instance.classeJudicial.codClasseJudicial) ? 'Triagem' : 'Verificar Custa'))}" name="Evoluiu classe?">
         <description><![CDATA[Criado em: 23/08/2016. Objetivo: Comparar a data da distribuição com a data atual, para transitar os processos a tarefa "Análise de prevenção" somente os que não forem de alteração de classe.]]></description>
         <transition to="Recupera Classe Judicial" name="Recupera Classe Judicial"/>
         <transition to="Verificar custa" name="Verificar custa"/>
+        <transition to="Triagem" name="Triagem"/>
     </decision>
     <node name="Recupera Classe Judicial">
         <transition to="Verifica o tipo de recurso" name="Verifica o tipo de recurso"/>
@@ -81,6 +91,7 @@ Atualizado em: 15/08/2016. Objetivo: Todos os processos protocolados e distribu�
                 <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
                 <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
                 <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+                <variable name="Plantao" mapped-name="textAlert:Plantao" access="read,write"/>
             </controller>
         </task>
         <transition to="Cria variável decisão (urgência) [BC2G]" name="01 - Minutar decisão (urgência)"/>
@@ -104,6 +115,7 @@ Atualizado em: 15/08/2016. Objetivo: Todos os processos protocolados e distribu�
                 <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
                 <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
                 <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+                <variable name="Plantao" mapped-name="textAlert:Plantao" access="read,write"/>
             </controller>
         </task>
         <transition to="Cria variável decisão (urgência) [BC2G]" name="01 - Minutar decisão (urgência)"/>
@@ -204,6 +216,7 @@ Atualizado em: 15/08/2016. Objetivo: Todos os processos protocolados e distribu�
         <task name="Triagem" swimlane="Secretaria">
             <controller>
                 <variable name="MovimentarLote" mapped-name="movimentarLote:MovimentarLote" access="read,write"/>
+                <variable name="Plantao" mapped-name="textAlert:Plantao" access="read,write"/>
             </controller>
         </task>
         <description><![CDATA[Atualizado: 25/07/2016
@@ -237,6 +250,9 @@ Objetivo: Incluindo transição para vice-presidencia]]></description>
         </transition>
         <transition to="Enviar a Presidência [BC2G]" name="15 - Remeter a Presidência">
             <condition expression="#{tramitacaoProcessualService.recuperaProcesso().orgaoJulgador.idOrgaoJulgador.toString() != parametroService.valueOf('tjmt:idOrgaoJulgador:Presidencia')}"/>
+        </transition>
+        <transition to="Setar dados Origem" name="16 - Devolver processo do plantão ">
+            <condition expression="#{tramitacaoProcessualService.recuperaVariavel('pje:FP2:atendidoPlantao')}"/>
         </transition>
         <event type="node-enter">
             <action expression="#{tramitacaoProcessualService.gravaVariavel('origemPAJ',5)}"/>
@@ -451,6 +467,7 @@ b) Adicionado o lançamento de movimento que demonstra a alteração da classe a
         <transition to="Remeter ao STF" name="Remeter ao STF"/>
         <transition to="Remeter ao STJ" name="Remeter ao STJ"/>
         <transition to="Verificar custa" name="Verificar custa"/>
+        <transition to="Recebidos do plantão" name="Recebidos do plantão"/>
     </task-node>
     <process-state name="Preparar relatório ou voto ">
         <sub-process name="Fluxo de decisão colegiada em gabinete" binding="late"/>
@@ -536,10 +553,10 @@ b) Adicionado o lançamento de movimento que demonstra a alteração da classe a
         <transition to="Preparar comunicação " name="Preparar comunicação "/>
         <transition to="Existe andamentos 269 ou 941?" name="Existe andamentos 269 ou 941?"/>
     </decision>
-    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 269 or tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 941 ? 'Declarado impedido, suspenso ou incompetente (Re-distribuir)' : (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:expedienteMiniPac') ? 'Registrar variavel de comunicação quando vindo do gabinete' : 'Verificar custa')}" name="Existe andamentos 269 ou 941?">
-        <transition to="Declarado impedido, suspenso ou incompetente (Re-distribuir)" name="Declarado impedido, suspenso ou incompetente (Re-distribuir)"/>
+    <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 269 or tramitacaoProcessualService.recuperaVariavel('pje:fp2:id:ultimoMovimento') == 941 ? '[FR] - Declarado impedido, suspenso ou incompetente (Re-distribuir)' : (tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:expedienteMiniPac') ? 'Registrar variavel de comunicação quando vindo do gabinete' : 'Verificar custa')}" name="Existe andamentos 269 ou 941?">
         <transition to="Verificar custa" name="Verificar custa"/>
         <transition to="Registrar variavel de comunicação quando vindo do gabinete" name="Registrar variavel de comunicação quando vindo do gabinete"/>
+        <transition to="[FR] - Declarado impedido, suspenso ou incompetente (Re-distribuir)" name="[FR] - Declarado impedido, suspenso ou incompetente (Re-distribuir)"/>
         <event type="node-leave">
             <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fp2:id:ultimoMovimento')}"/>
         </event>
@@ -591,12 +608,6 @@ b) Adicionado o lançamento de movimento que demonstra a alteração da classe a
         <sub-process name="Analisar prevenção" binding="late"/>
         <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
     </process-state>
-    <node name="Registrar variável turma recursal">
-        <transition to="Intimar Ministério Público" name="Intimar Ministério Público"/>
-        <event type="node-leave">
-            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fp2:turmaRecursal', processoTrfHome.getInstance().getJurisdicao())}"/>
-        </event>
-    </node>
     <process-state name="Intimar ou Citar">
         <sub-process name="Preparar ato de comunicação" binding="late"/>
         <transition to="Cria variável de admissibilidade" name="Registrar conclusão para decisão admissibilidade"/>
@@ -722,6 +733,7 @@ Ojetivo: Deslocar o processo para o órgão julgador de origem]]></description>
                 <variable name="txtObservacao" mapped-name="text:txtObservacao" access="read,write"/>
                 <variable name="ConfirmacaoObrigatoria" mapped-name="radio_sim_nao:ConfirmacaoObrigatoria" access="read,write,required"/>
                 <variable name="WEB-INF_xhtml_flx_paginaExterna" mapped-name="frame:WEB-INF_xhtml_flx_paginaExterna" access="read,write"/>
+                <variable name="Local2" mapped-name="textAlert:Local2" access="read,write"/>
             </controller>
         </task>
         <transition to="Triagem" name="01 - Triagem"/>
@@ -757,6 +769,101 @@ Ojetivo: Deslocar o processo para o órgão julgador de origem]]></description>
     <process-state name="[FP2] - Analisar prevenção">
         <sub-process name="Analisar prevenção" binding="late"/>
         <transition to="Triagem" name="Triagem"/>
+    </process-state>
+    <node name="Setar dados do plantonista">
+        <description><![CDATA[Busca as informações do Orgão Julgador, Orgão Colegiado e Cargo da tabela de parametros
+Gravar a origem. 
+
+A variavel: 'pje:FP2:atendidoPlantao' indica que o processo foi atendido no plantão.]]></description>
+        <transition to="Deslocar para o plantão" name="Deslocar para o plantão"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoOrigem',tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgador())}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoCargoOrigem',(orgaoJulgadorCargoDAO.getOrgaoJulgadorCargo(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgador(),false).getCargo()))}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoOrigem',tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado())}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:orgaoDestino')}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:pessoaRelatorOrigem',tramitacaoProcessualService.recuperaProcesso().getPessoaRelator())}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:FP2:orgaoJulgadorCargoOrigem',(orgaoJulgadorCargoDAO.getOrgaoJulgadorCargo(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgador(),false)))}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:orgaoCargoDestino')}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:colegiadoDestino')}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:FP2:atendidoPlantao',true)}"/>
+        </event>
+        <event type="node-leave">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoDestino', parametroService.valueOf(&quot;idOjPlantao&quot;))}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoCargoDestino', parametroService.valueOf(&quot;IdOCPlantao&quot;))}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoDestino',parametroService.valueOf(&quot;idOjCPlantao&quot;))}"/>
+        </event>
+    </node>
+    <node name="Deslocar para o plantão">
+        <description><![CDATA[Movimenta o processo para o  plantão]]></description>
+        <transition to="Registrar remessa para plantonista" name="Registrar remessa para plantonista"/>
+        <event type="node-enter">
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setPessoaRelator(pessoaMagistradoDAO.getMagistradoTitular(orgaoJulgadorService.findById(parametroService.valueOf('idOjPlantao'))))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgador(orgaoJulgadorService.findById(parametroService.valueOf('idOjPlantao')))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgadorColegiado(orgaoJulgadorService.findById(parametroService.valueOf('idOjPlantao')).getOrgaoJulgadorColegiadoOrgaoJulgadorList().get(0).getOrgaoJulgadorColegiado())}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setCargo(orgaoJulgadorCargoDAO.getOrgaoJulgadorCargo(orgaoJulgadorService.findById(parametroService.valueOf('idOjPlantao')),false).getCargo())}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgadorCargo(orgaoJulgadorCargoDAO.getOrgaoJulgadorCargo(orgaoJulgadorService.findById(parametroService.valueOf('idOjPlantao')),false))}"/>
+            <action expression="#{processoTrfConexaoHome.update()}"/>
+        </event>
+    </node>
+    <node name="Deslocar para Origem">
+        <description><![CDATA[Desloca o processo para o órgão de origem após o atendimento no plantão
+
+Apaga as variaveis que armazenam a origem antes do deslocamento para o plantao.]]></description>
+        <transition to="Registrar remessa para origem" name="Registrar remessa para origem"/>
+        <event type="node-leave">
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setPessoaRelator(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:pessoaRelatorOrigem'))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgador(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:orgaoOrigem'))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgadorColegiado(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:colegiadoOrigem'))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setCargo(tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:orgaoCargoOrigem'))}"/>
+            <action expression="#{tramitacaoProcessualService.recuperaProcesso().setOrgaoJulgadorCargo(tramitacaoProcessualService.recuperaVariavel('pje:FP2:orgaoJulgadorCargoOrigem'))}"/>
+            <action expression="#{processoTrfConexaoHome.update()}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:colegiadoOrigem')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:orgaoCargoOrigem')}"/>
+            <action expression="#{tramitacaoProcessualService.apagaVariavel('pje:fluxo:deslocamento:orgaoOrigem')}"/>
+        </event>
+    </node>
+    <node name="Setar dados Origem">
+        <description><![CDATA[Seta dados para o processo retornar a origem após atendimento em plantão]]></description>
+        <transition to="Deslocar para Origem" name="Deslocar para Origem"/>
+        <event type="node-enter">
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoDestino', tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:orgaoOrigem').idOrgaoJulgador)}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:orgaoCargoDestino', tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:orgaoCargoOrigem').idCargo)}"/>
+            <action name="upd" expression="#{tramitacaoProcessualService.gravaVariavel('pje:fluxo:deslocamento:colegiadoDestino', tramitacaoProcessualService.recuperaVariavel('pje:fluxo:deslocamento:colegiadoOrigem').idOrgaoJulgadorColegiado)}"/>
+        </event>
+    </node>
+    <process-state name="[AP] - Analisar prevenção - Plantão">
+        <sub-process name="Analisar prevenção" binding="late"/>
+        <description><![CDATA[sub processo Análisar prevenção para direcionar do plantão.]]></description>
+        <transition to="Recebidos do plantão" name="Recebidos do plantão"/>
+    </process-state>
+    <task-node end-tasks="true" name="Recebidos do plantão">
+        <task name="Recebidos do plantão" swimlane="Secretaria"/>
+        <description><![CDATA[Tarefa para agrupar na secretaria os processos recebidos da secretaria de plantão]]></description>
+        <transition to="Nó de Desvio - Fluxo processual 2 Grau" name="Nó de Desvio - Fluxo processual 2 Grau">
+            <condition expression="#{true}"/>
+        </transition>
+        <transition to="Triagem" name="Triagem"/>
+    </task-node>
+    <node name="Registrar remessa para plantonista">
+        <transition to="Registrar variável segundo grau [BC2G]" name="Registrar variável segundo grau [BC2G]"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(' apreciação do Orgão Julgador Plantonista: '.concat(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado().getOrgaoJulgadorColegiado())).lancarMovimento()}"/>
+            <action expression="#{preencherMovimento.deCodigo(132).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(' Recebido pelo plantonista').lancarMovimento()}"/>
+        </event>
+    </node>
+    <node name="Registrar remessa para origem">
+        <transition to="[AP] - Analisar prevenção - Plantão" name="[AP] - Analisar prevenção - Plantão"/>
+        <event type="node-leave">
+            <action expression="#{preencherMovimento.deCodigo(123).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(' o Orgão Julgador Colegiado '.concat(tramitacaoProcessualService.recuperaProcesso().getOrgaoJulgadorColegiado().getOrgaoJulgadorColegiado())).lancarMovimento()}"/>
+            <action expression="#{preencherMovimento.deCodigo(132).comComplementoDeCodigo(18).doTipoDominio().preencherComElementoDeCodigo(40).comComplementoDeCodigo(7).doTipoLivre().preencherComTexto(' Recebido pelo Orgão Julgador Colegiado.').lancarMovimento()}"/>
+        </event>
+    </node>
+    <process-state name="[FR] - Declarado impedido, suspenso ou incompetente (Re-distribuir)">
+        <sub-process name="Fluxo de redistribuição" binding="late"/>
+        <transition to="Cumprir decisão [BC2G]" name="01 - Cumprir decisão"/>
+        <event type="node-enter">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('01 - Cumprir decisão')}"/>
+        </event>
     </process-state>  
     <!-- PROCESS-EVENTS -->
     <event type="node-enter">
