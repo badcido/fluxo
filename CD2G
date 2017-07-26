@@ -51,7 +51,7 @@
         <transition to="Aguardar prazos para manifestação" name="02 - Aguardar prazos para manifestação"/>
         <transition to="Avaliar bens " name="04 - Avaliar bens "/>
         <transition to="Selecionar jurisdição" name="18 - Redistribuir processo em outra jurisdição"/>
-        <transition to="Redistribuir processo" name="15 - Redistribuir processo"/>
+        <transition to="[FR] - Redistribuir processo" name="15 - Redistribuir processo"/>
         <event type="task-create">
             <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
         </event>
@@ -83,7 +83,7 @@
         <transition to="Aguardar prazos para manifestação" name="02 - Aguardar prazos para manifestação"/>
         <transition to="Avaliar bens " name="04 - Avaliar bens "/>
         <transition to="Selecionar jurisdição" name="18 - Redistribuir processo em outra jurisdição"/>
-        <transition to="Redistribuir processo" name="15 - Redistribuir processo"/>
+        <transition to="[FR] - Redistribuir processo" name="15 - Redistribuir processo"/>
         <event type="task-create">
             <action name="upd" expression="#{taskInstanceUtil.setVariable('mostrarBotaoGravarNoFluxo','false')}"/>
         </event>
@@ -272,7 +272,7 @@
         </event>
         <event type="node-leave">
             <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:codigo:jurisdicao:selecionada', tramitacaoProcessualService.recuperaVariavelTarefa('combo_objetos:combo_jurisdicao'))}"/>
-            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida', 'Redistribuir processo')}"/>
+            <action expression="#{tramitacaoProcessualService.gravaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida', '[FR] - Redistribuir processo')}"/>
         </event>
     </task-node>
     <node name="Alterar jurisdicao">
@@ -285,9 +285,16 @@
         </event>
     </node>
     <decision expression="#{tramitacaoProcessualService.recuperaVariavel('pje:tjmt:fluxo:alterar:jurisdicao:saida')}" name="Tramitar após alteração da jurisdição">
-        <transition to="Redistribuir processo" name="Redistribuir processo"/>
         <transition to="Verifica urgencia" name="Verifica urgencia"/>
-    </decision>  
+        <transition to="[FR] - Redistribuir processo" name="[FR] - Redistribuir processo"/>
+    </decision>
+    <process-state name="[FR] - Redistribuir processo">
+        <sub-process name="Fluxo de redistribuição" binding="late"/>
+        <transition to="Término" name="Término"/>
+        <event type="node-enter">
+            <action expression="#{taskInstanceUtil.setFrameDefaultTransition('Término')}"/>
+        </event>
+    </process-state>  
     <!-- PROCESS-EVENTS -->
     <event type="node-enter">
         <script>br.com.infox.ibpm.util.JbpmEvents.raiseEvent(executionContext)</script>
